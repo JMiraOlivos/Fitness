@@ -44,6 +44,14 @@ type LocalSetLog = {
   rpe: number | null;
 };
 
+type WorkoutInsightResponse = {
+  insight?: string;
+  focoProximoEntrenamiento?: string;
+  alerta?: string;
+  score?: number;
+  error?: string;
+};
+
 function getJoinedExercise(exercises: RoutineExerciseRow["exercises"]) {
   if (Array.isArray(exercises)) {
     return exercises[0] ?? null;
@@ -58,6 +66,16 @@ function defaultInput(): SetInput {
     reps: "",
     rpe: "8",
   };
+}
+
+function getVolume(logs: LocalSetLog[]) {
+  return logs.reduce((sum, log) => sum + log.weight * log.reps, 0);
+}
+
+function getAverageRpe(logs: LocalSetLog[]) {
+  const rpeLogs = logs.filter((log) => log.rpe !== null);
+  if (rpeLogs.length === 0) return null;
+  return rpeLogs.reduce((sum, log) => sum + Number(log.rpe || 0), 0) / rpeLogs.length;
 }
 
 export default function EntrenarPage() {
@@ -271,6 +289,68 @@ export default function EntrenarPage() {
     }
   }
 
+  async function generarInsightEntrenamiento(totalSets: number, totalVolume: number) {
+    const allLogs = Object.values(setLogs).flat();
+    const averageRpe = getAverageRpe(allLogs);
+    const fallbackInsight = `Entrenamiento finalizado con ${totalSets} series y ${Math.round(totalVolume)} kg de volumen total.`;
+
+    const exerciseSummaries = routineExercises
+      .map((item) => {
+        const exercise = getJoinedExercise(item.exercises);
+        const logs = exercise?.id ? setLogs[exercise.id] || [] : [];
+
+        return {
+          exerciseName: exercise?.name || "Ejercicio",
+          targetMuscle: exercise?.target_muscle || "",
+          sets: logs.length,
+          volume: getVolume(logs),
+          maxWeight: logs.reduce((max, log) => Math.max(max, log.weight), 0),
+          averageRpe: getAverageRpe(logs),
+        };
+      })
+      .filter((summary) => summary.sets > 0);
+
+    try {
+      const response = await fetch("/api/ai/analizar-entrenamiento", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          routineTitle: routine?.title,
+          routineDescription: routine?.description,
+          totalSets,
+          totalVolume,
+          averageRpe,
+          startedAt: startTime?.toISOString(),
+          finishedAt: new Date().toISOString(),
+          exerciseSummaries,
+        }),
+      });
+
+      if (!response.ok) {
+        return fallbackInsight;
+      }
+
+      const data = (await response.json()) as WorkoutInsightResponse;
+
+      if (!data.insight) {
+        return fallbackInsight;
+      }
+
+      return [
+        data.insight,
+        data.focoProximoEntrenamiento ? `Próximo foco: ${data.focoProximoEntrenamiento}` : null,
+        data.alerta && data.alerta !== "Sin alertas relevantes" ? `Alerta: ${data.alerta}` : null,
+        data.score ? `Score IA: ${data.score}/10.` : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    } catch {
+      return fallbackInsight;
+    }
+  }
+
   async function finalizarEntrenamiento() {
     setError(null);
     setSuccessMessage(null);
@@ -283,15 +363,21 @@ export default function EntrenarPage() {
     setIsFinishing(true);
 
     const totalSets = Object.values(setLogs).reduce((sum, logs) => sum + logs.length, 0);
-    const totalVolume = Object.values(setLogs).reduce((sum, logs) => {
-      return sum + logs.reduce((innerSum, log) => innerSum + log.weight * log.reps, 0);
-    }, 0);
+    const totalVolume = Object.values(setLogs).reduce((sum, logs) => sum + getVolume(logs), 0);
+
+    if (totalSets === 0) {
+      setIsFinishing(false);
+      setError("Registra al menos una serie antes de finalizar.");
+      return;
+    }
+
+    const aiInsight = await generarInsightEntrenamiento(totalSets, totalVolume);
 
     const { error: updateError } = await supabase
       .from("workout_logs")
       .update({
         end_time: new Date().toISOString(),
-        ai_insight: `Entrenamiento finalizado con ${totalSets} series y ${Math.round(totalVolume)} kg de volumen total.`,
+        ai_insight: aiInsight,
       })
       .eq("id", workoutLogId);
 
@@ -302,7 +388,7 @@ export default function EntrenarPage() {
       return;
     }
 
-    setSuccessMessage(`Entrenamiento finalizado: ${totalSets} series, ${Math.round(totalVolume)} kg de volumen.`);
+    setSuccessMessage(`Entrenamiento finalizado: ${totalSets} series, ${Math.round(totalVolume)} kg de volumen. Insight IA guardado.`);
   }
 
   if (isLoading) {
@@ -385,7 +471,7 @@ export default function EntrenarPage() {
           className="rounded-2xl bg-zinc-900 px-4 py-3 font-black text-white inline-flex items-center justify-center gap-2 disabled:opacity-40"
         >
           {isFinishing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Square className="h-5 w-5" />}
-          Finalizar
+          {isFinishing ? "Analizando..." : "Finalizar"}
         </button>
       </section>
 
