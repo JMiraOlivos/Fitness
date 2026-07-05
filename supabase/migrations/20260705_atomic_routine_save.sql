@@ -114,3 +114,24 @@ end;
 $$;
 
 grant execute on function public.save_routine_with_exercises(text, text, jsonb) to authenticated;
+
+create or replace function public.save_ai_routine(p_routine jsonb)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_routine is null or jsonb_typeof(p_routine) <> 'object' then
+    raise exception 'Routine payload must be a JSON object';
+  end if;
+
+  return public.save_routine_with_exercises(
+    p_routine->>'titulo',
+    p_routine->>'descripcion',
+    p_routine->'ejercicios'
+  );
+end;
+$$;
+
+grant execute on function public.save_ai_routine(jsonb) to authenticated;
