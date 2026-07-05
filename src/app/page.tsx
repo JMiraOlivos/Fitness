@@ -24,22 +24,34 @@ type RutinaResponse = {
   rutinas: RutinaIA[];
 };
 
+type EjercicioGuardado = {
+  name: string;
+  target_muscle: string;
+  equipment: string;
+};
+
+type RutinaExerciseGuardada = {
+  target_sets: number | null;
+  target_reps: string | null;
+  notes: string | null;
+  exercises?: EjercicioGuardado | EjercicioGuardado[] | null;
+};
+
 type RutinaGuardada = {
   id: string;
   title: string;
   description: string | null;
   created_at: string;
-  routine_exercises?: Array<{
-    target_sets: number | null;
-    target_reps: string | null;
-    notes: string | null;
-    exercises?: {
-      name: string;
-      target_muscle: string;
-      equipment: string;
-    } | null;
-  }>;
+  routine_exercises?: RutinaExerciseGuardada[];
 };
+
+function getJoinedExercise(exercises: RutinaExerciseGuardada["exercises"]) {
+  if (Array.isArray(exercises)) {
+    return exercises[0] ?? null;
+  }
+
+  return exercises ?? null;
+}
 
 export default function Dashboard() {
   const [diasDisponibles, setDiasDisponibles] = useState("4");
@@ -140,7 +152,7 @@ export default function Dashboard() {
     if (loadError) {
       setError(loadError.message);
     } else {
-      setRutinasGuardadas((data || []) as RutinaGuardada[]);
+      setRutinasGuardadas((data || []) as unknown as RutinaGuardada[]);
     }
 
     setIsLoadingSaved(false);
@@ -463,12 +475,16 @@ export default function Dashboard() {
                 <Dumbbell className="h-5 w-5 text-[#CCFF00] shrink-0" />
               </div>
               <div className="mt-4 grid gap-2">
-                {(rutina.routine_exercises || []).map((item, index) => (
-                  <div key={`${rutina.id}-${index}`} className="flex items-center justify-between rounded-xl bg-zinc-950 px-3 py-2 text-xs">
-                    <span className="text-zinc-300">{item.exercises?.name || "Ejercicio"}</span>
-                    <span className="text-zinc-500">{item.target_sets || 3}x {item.target_reps || "10-12"}</span>
-                  </div>
-                ))}
+                {(rutina.routine_exercises || []).map((item, index) => {
+                  const exercise = getJoinedExercise(item.exercises);
+
+                  return (
+                    <div key={`${rutina.id}-${index}`} className="flex items-center justify-between rounded-xl bg-zinc-950 px-3 py-2 text-xs">
+                      <span className="text-zinc-300">{exercise?.name || "Ejercicio"}</span>
+                      <span className="text-zinc-500">{item.target_sets || 3}x {item.target_reps || "10-12"}</span>
+                    </div>
+                  );
+                })}
               </div>
             </article>
           ))}
