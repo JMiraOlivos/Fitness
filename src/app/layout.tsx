@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ProgressFloatingButton } from "@/components/ProgressFloatingButton";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,7 +18,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body className="bg-black antialiased">{children}</body>
+      <body className="bg-black antialiased">
+        {children}
+        <ProgressFloatingButton />
+      </body>
     </html>
   );
 }
