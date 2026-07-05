@@ -46,6 +46,34 @@ type RutinaGuardada = {
   routine_exercises?: RutinaExerciseGuardada[];
 };
 
+type MetricSetLog = {
+  weight: number | null;
+  reps: number | null;
+};
+
+type MetricWorkout = {
+  id: string;
+  start_time: string;
+  end_time: string | null;
+  set_logs?: MetricSetLog[];
+};
+
+type DashboardMetrics = {
+  weeklyVolume: number;
+  weeklySets: number;
+  weeklyWorkouts: number;
+  currentStreak: number;
+  lastWorkoutLabel: string;
+};
+
+const initialMetrics: DashboardMetrics = {
+  weeklyVolume: 0,
+  weeklySets: 0,
+  weeklyWorkouts: 0,
+  currentStreak: 0,
+  lastWorkoutLabel: "Sin registros",
+};
+
 function getJoinedExercise(exercises: RutinaExerciseGuardada["exercises"]) {
   if (Array.isArray(exercises)) {
     return exercises[0] ?? null;
@@ -54,18 +82,62 @@ function getJoinedExercise(exercises: RutinaExerciseGuardada["exercises"]) {
   return exercises ?? null;
 }
 
+function getWorkoutVolume(setLogs?: MetricSetLog[]) {
+  return (setLogs || []).reduce((sum, setLog) => {
+    return sum + Number(setLog.weight || 0) * Number(setLog.reps || 0);
+  }, 0);
+}
+
+function getLocalDateKey(value: string | Date) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return date.toLocaleDateString("en-CA");
+}
+
+function calcularRacha(workouts: MetricWorkout[]) {
+  const completedWorkoutDates = new Set(
+    workouts
+      .filter((workout) => workout.end_time)
+      .map((workout) => getLocalDateKey(workout.start_time))
+  );
+
+  let streak = 0;
+  const cursor = new Date();
+
+  while (completedWorkoutDates.has(getLocalDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+}
+
+function formatKg(value: number) {
+  return new Intl.NumberFormat("es-CL").format(Math.round(value));
+}
+
+function getLastWorkoutLabel(workouts: MetricWorkout[]) {
+  if (workouts.length === 0) {
+    return "Sin registros";
+  }
+
+  return new Date(workouts[0].start_time).toLocaleDateString("es-CL", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
 export default function Dashboard() {
   const [diasDisponibles, setDiasDisponibles] = useState("4");
   const [enfoque, setEnfoque] = useState("Hipertrofia upper/lower");
   const [restricciones, setRestricciones] = useState("Sin dominadas, sin sentadillas búlgaras y priorizar poleas");
   const [rutinasIA, setRutinasIA] = useState<RutinaIA[]>([]);
   const [rutinasGuardadas, setRutinasGuardadas] = useState<RutinaGuardada[]>([]);
+  const [metrics, setMetrics] = useState<DashboardMetrics>(initialMetrics);
   const [user, setUser] = useState<User | null>(null);
-  const [email, setEmail] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
-  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +153,7 @@ export default function Dashboard() {
       setUser(data.user);
       if (data.user) {
         void cargarRutinasGuardadas();
+        void cargarMetricasDashboard();
       }
     });
 
@@ -88,44 +161,21 @@ export default function Dashboard() {
       setUser(session?.user ?? null);
       if (session?.user) {
         void cargarRutinasGuardadas();
+        void cargarMetricasDashboard();
       } else {
         setRutinasGuardadas([]);
+        setMetrics(initialMetrics);
       }
     });
 
     return () => subscription.subscription.unsubscribe();
   }, []);
 
-  async function iniciarSesion() {
-    setError(null);
-    setAuthMessage(null);
-
-    if (!email.trim()) {
-      setError("Ingresa tu email para iniciar sesión.");
-      return;
-    }
-
-    const redirectTo = `${window.location.origin}/auth/callback`;
-
-    const { error: signInError } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: redirectTo,
-      },
-    });
-
-    if (signInError) {
-      setError(signInError.message);
-      return;
-    }
-
-    setAuthMessage("Te enviamos un magic link. Abre el correo para iniciar sesión.");
-  }
-
   async function cerrarSesion() {
     await supabase.auth.signOut();
     setUser(null);
     setRutinasGuardadas([]);
+    setMetrics(initialMetrics);
   }
 
   async function cargarRutinasGuardadas() {
@@ -159,6 +209,52 @@ export default function Dashboard() {
     }
 
     setIsLoadingSaved(false);
+  }
+
+  async function cargarMetricasDashboard() {
+    setIsLoadingMetrics(true);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const { data, error: metricsError } = await supabase
+      .from("workout_logs")
+      .select(`
+        id,
+        start_time,
+        end_time,
+        set_logs (
+          weight,
+          reps
+        )
+      `)
+      .gte("start_time", thirtyDaysAgo.toISOString())
+      .order("start_time", { ascending: false });
+
+    if (metricsError) {
+      setError(metricsError.message);
+      setIsLoadingMetrics(false);
+      return;
+    }
+
+    const workouts = (data || []) as unknown as MetricWorkout[];
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const weeklyWorkouts = workouts.filter((workout) => new Date(workout.start_time) >= sevenDaysAgo);
+    const completedWeeklyWorkouts = weeklyWorkouts.filter((workout) => workout.end_time);
+    const weeklyVolume = weeklyWorkouts.reduce((sum, workout) => sum + getWorkoutVolume(workout.set_logs), 0);
+    const weeklySets = weeklyWorkouts.reduce((sum, workout) => sum + (workout.set_logs?.length || 0), 0);
+
+    setMetrics({
+      weeklyVolume,
+      weeklySets,
+      weeklyWorkouts: completedWeeklyWorkouts.length,
+      currentStreak: calcularRacha(workouts),
+      lastWorkoutLabel: getLastWorkoutLabel(workouts),
+    });
+
+    setIsLoadingMetrics(false);
   }
 
   async function generarRutina() {
@@ -277,43 +373,44 @@ export default function Dashboard() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Cuenta</p>
-            <h2 className="text-lg font-bold">{user ? "Sesión activa" : "Guardar progreso"}</h2>
-            <p className="text-xs text-zinc-500 mt-1">{user ? user.email : "Inicia sesión para guardar rutinas en Supabase."}</p>
+            <h2 className="text-lg font-bold">{user ? "Sesión activa" : "Crea tu usuario"}</h2>
+            <p className="text-xs text-zinc-500 mt-1">{user ? user.email : "Usa email y contraseña para guardar progreso."}</p>
           </div>
-          {user && (
+          {user ? (
             <button onClick={cerrarSesion} className="rounded-full bg-zinc-900 p-3 text-zinc-400">
               <LogOut className="h-5 w-5" />
             </button>
+          ) : (
+            <Link href="/auth" className="rounded-full bg-[#CCFF00] px-4 py-2 text-xs font-black text-black">
+              Ingresar
+            </Link>
           )}
         </div>
-
-        {!user && (
-          <div className="mt-4 grid gap-3">
-            <input
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              type="email"
-              placeholder="tu@email.com"
-              className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00]"
-            />
-            <button onClick={iniciarSesion} className="w-full rounded-2xl bg-white px-4 py-3 font-bold text-black">
-              Enviar magic link
-            </button>
-          </div>
-        )}
-
-        {authMessage && <p className="mt-3 text-sm text-[#CCFF00]">{authMessage}</p>}
       </section>
 
-      <section className="grid grid-cols-2 gap-4 mb-8">
+      <section className="grid grid-cols-2 gap-4 mb-4">
         <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
-          <p className="text-xs text-zinc-500 uppercase font-bold">Volumen Semanal</p>
-          <p className="text-2xl font-bold mt-1">42,500 <span className="text-[10px] text-zinc-400">kg</span></p>
+          <p className="text-xs text-zinc-500 uppercase font-bold">Volumen Semana</p>
+          <p className="text-2xl font-bold mt-1">
+            {isLoadingMetrics ? "..." : formatKg(metrics.weeklyVolume)} <span className="text-[10px] text-zinc-400">kg</span>
+          </p>
         </div>
         <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
-          <p className="text-xs text-zinc-500 uppercase font-bold">Racha Actual</p>
-          <p className="text-2xl font-bold mt-1">12 <span className="text-[10px] text-zinc-400">días</span></p>
+          <p className="text-xs text-zinc-500 uppercase font-bold">Series Semana</p>
+          <p className="text-2xl font-bold mt-1">{isLoadingMetrics ? "..." : metrics.weeklySets}</p>
         </div>
+        <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
+          <p className="text-xs text-zinc-500 uppercase font-bold">Workouts</p>
+          <p className="text-2xl font-bold mt-1">{isLoadingMetrics ? "..." : metrics.weeklyWorkouts}</p>
+        </div>
+        <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
+          <p className="text-xs text-zinc-500 uppercase font-bold">Racha</p>
+          <p className="text-2xl font-bold mt-1">{isLoadingMetrics ? "..." : metrics.currentStreak} <span className="text-[10px] text-zinc-400">días</span></p>
+        </div>
+      </section>
+
+      <section className="mb-8 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-xs text-zinc-500">
+        Último entrenamiento: <span className="font-bold text-zinc-300">{isLoadingMetrics ? "Cargando..." : metrics.lastWorkoutLabel}</span>
       </section>
 
       <section className="grid grid-cols-2 gap-3 mb-8">
@@ -466,8 +563,15 @@ export default function Dashboard() {
       <section className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold">Rutinas guardadas</h3>
-          <button onClick={cargarRutinasGuardadas} disabled={!user || isLoadingSaved} className="text-[#CCFF00] text-sm flex items-center gap-1 disabled:opacity-40">
-            {isLoadingSaved ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />}
+          <button
+            onClick={() => {
+              void cargarRutinasGuardadas();
+              void cargarMetricasDashboard();
+            }}
+            disabled={!user || isLoadingSaved || isLoadingMetrics}
+            className="text-[#CCFF00] text-sm flex items-center gap-1 disabled:opacity-40"
+          >
+            {isLoadingSaved || isLoadingMetrics ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />}
             Actualizar
           </button>
         </div>
