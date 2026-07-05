@@ -51,14 +51,31 @@ begin
       raise exception 'El ejercicio % no tiene nombre.', exercise_order;
     end if;
 
-    insert into public.exercises (name, target_muscle, equipment)
-    values (exercise_name, exercise_target_muscle, exercise_equipment)
-    on conflict on constraint exercises_normalized_identity_idx
-    do update set
-      name = excluded.name,
-      target_muscle = excluded.target_muscle,
-      equipment = excluded.equipment
-    returning id into exercise_id;
+    select id into exercise_id
+    from public.exercises
+    where lower(btrim(name)) = lower(btrim(exercise_name))
+      and lower(btrim(target_muscle)) = lower(btrim(exercise_target_muscle))
+      and lower(btrim(equipment)) = lower(btrim(exercise_equipment))
+    limit 1;
+
+    if exercise_id is null then
+      begin
+        insert into public.exercises (name, target_muscle, equipment)
+        values (exercise_name, exercise_target_muscle, exercise_equipment)
+        returning id into exercise_id;
+      exception when unique_violation then
+        select id into exercise_id
+        from public.exercises
+        where lower(btrim(name)) = lower(btrim(exercise_name))
+          and lower(btrim(target_muscle)) = lower(btrim(exercise_target_muscle))
+          and lower(btrim(equipment)) = lower(btrim(exercise_equipment))
+        limit 1;
+      end;
+    end if;
+
+    if exercise_id is null then
+      raise exception 'No se pudo crear o reutilizar el ejercicio %.', exercise_name;
+    end if;
 
     insert into public.routine_exercises (
       routine_id,
