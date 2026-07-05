@@ -1,5 +1,6 @@
 -- Atomic routine persistence.
 -- Saves a routine, deduplicates exercises, and creates routine_exercises in one database transaction.
+-- Requires the exercises_normalized_identity_idx unique index from 20260705_harden_exercise_deduplication.sql.
 
 create or replace function public.save_routine_with_exercises(
   p_title text,
@@ -74,7 +75,7 @@ begin
     if v_exercise_id is null then
       insert into public.exercises (name, target_muscle, equipment)
       values (v_name, v_target_muscle, v_equipment)
-      on conflict on constraint exercises_normalized_identity_idx do nothing
+      on conflict do nothing
       returning id into v_exercise_id;
 
       if v_exercise_id is null then
