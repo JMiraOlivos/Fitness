@@ -123,9 +123,9 @@ export default function HistorialPage() {
       {!user && !isLoading && (
         <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5">
           <h2 className="text-xl font-black">Inicia sesión primero</h2>
-          <p className="text-sm text-zinc-400 mt-2">Vuelve al dashboard e inicia sesión para ver tu historial.</p>
-          <Link href="/" className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-[#CCFF00] px-4 py-3 font-black text-black">
-            Ir al dashboard
+          <p className="text-sm text-zinc-400 mt-2">Crea usuario o inicia sesión para ver tu historial.</p>
+          <Link href="/auth" className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-[#CCFF00] px-4 py-3 font-black text-black">
+            Ir a login
           </Link>
         </section>
       )}
@@ -214,6 +214,13 @@ export default function HistorialPage() {
                   {workout.ai_insight}
                 </p>
               )}
+
+              <Link
+                href={`/historial/${workout.id}`}
+                className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[#CCFF00] px-4 py-3 font-black text-black"
+              >
+                Ver detalle
+              </Link>
             </article>
           );
         })}
