@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { BrainCircuit, Dumbbell, History, Loader2, Plus, Sparkles, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { BrainCircuit, CheckCircle2, Dumbbell, History, Loader2, LogOut, Plus, Save, Sparkles, TrendingUp } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 type EjercicioIA = {
   nombre: string;
@@ -22,24 +24,132 @@ type RutinaResponse = {
   rutinas: RutinaIA[];
 };
 
+type RutinaGuardada = {
+  id: string;
+  title: string;
+  description: string | null;
+  created_at: string;
+  routine_exercises?: Array<{
+    target_sets: number | null;
+    target_reps: string | null;
+    notes: string | null;
+    exercises?: {
+      name: string;
+      target_muscle: string;
+      equipment: string;
+    } | null;
+  }>;
+};
+
 export default function Dashboard() {
   const [diasDisponibles, setDiasDisponibles] = useState("4");
   const [enfoque, setEnfoque] = useState("Hipertrofia upper/lower");
   const [restricciones, setRestricciones] = useState("Sin dominadas, sin sentadillas búlgaras y priorizar poleas");
   const [rutinasIA, setRutinasIA] = useState<RutinaIA[]>([]);
+  const [rutinasGuardadas, setRutinasGuardadas] = useState<RutinaGuardada[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [email, setEmail] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const routines = [
+  const fallbackRoutines = [
     { id: 1, title: "Upper A", focus: "Pecho/Espalda", exercises: 6 },
     { id: 2, title: "Lower A", focus: "Cuádriceps/Isquios", exercises: 5 },
     { id: 3, title: "Upper B", focus: "Poleas/Accesorios", exercises: 6 },
     { id: 4, title: "Lower B", focus: "Glúteos/Isquios", exercises: 5 },
   ];
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      if (data.user) {
+        void cargarRutinasGuardadas();
+      }
+    });
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        void cargarRutinasGuardadas();
+      } else {
+        setRutinasGuardadas([]);
+      }
+    });
+
+    return () => subscription.subscription.unsubscribe();
+  }, []);
+
+  async function iniciarSesion() {
+    setError(null);
+    setAuthMessage(null);
+
+    if (!email.trim()) {
+      setError("Ingresa tu email para iniciar sesión.");
+      return;
+    }
+
+    const { error: signInError } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (signInError) {
+      setError(signInError.message);
+      return;
+    }
+
+    setAuthMessage("Te enviamos un magic link. Abre el correo para iniciar sesión.");
+  }
+
+  async function cerrarSesion() {
+    await supabase.auth.signOut();
+    setUser(null);
+    setRutinasGuardadas([]);
+  }
+
+  async function cargarRutinasGuardadas() {
+    setIsLoadingSaved(true);
+
+    const { data, error: loadError } = await supabase
+      .from("routines")
+      .select(`
+        id,
+        title,
+        description,
+        created_at,
+        routine_exercises (
+          target_sets,
+          target_reps,
+          notes,
+          exercises (
+            name,
+            target_muscle,
+            equipment
+          )
+        )
+      `)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (loadError) {
+      setError(loadError.message);
+    } else {
+      setRutinasGuardadas((data || []) as RutinaGuardada[]);
+    }
+
+    setIsLoadingSaved(false);
+  }
+
   async function generarRutina() {
     setIsGenerating(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       const response = await fetch("/api/ai/generar-rutina", {
@@ -68,6 +178,72 @@ export default function Dashboard() {
     }
   }
 
+  async function guardarRutina(rutina: RutinaIA) {
+    setError(null);
+    setSuccessMessage(null);
+
+    if (!user) {
+      setError("Inicia sesión para guardar rutinas en Supabase.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const { data: routineRow, error: routineError } = await supabase
+        .from("routines")
+        .insert({
+          user_id: user.id,
+          title: rutina.titulo,
+          description: rutina.descripcion,
+        })
+        .select("id")
+        .single();
+
+      if (routineError) throw routineError;
+      if (!routineRow?.id) throw new Error("No se pudo crear la rutina.");
+
+      for (const [index, ejercicio] of rutina.ejercicios.entries()) {
+        const { data: exerciseRow, error: exerciseError } = await supabase
+          .from("exercises")
+          .insert({
+            name: ejercicio.nombre,
+            target_muscle: ejercicio.musculoObjetivo,
+            equipment: ejercicio.equipamiento,
+          })
+          .select("id")
+          .single();
+
+        if (exerciseError) throw exerciseError;
+        if (!exerciseRow?.id) throw new Error(`No se pudo crear el ejercicio ${ejercicio.nombre}.`);
+
+        const { error: relationError } = await supabase.from("routine_exercises").insert({
+          routine_id: routineRow.id,
+          exercise_id: exerciseRow.id,
+          order_index: index + 1,
+          target_sets: ejercicio.seriesObjetivo,
+          target_reps: ejercicio.repeticionesObjetivo,
+          notes: ejercicio.notas,
+        });
+
+        if (relationError) throw relationError;
+      }
+
+      setSuccessMessage(`Rutina "${rutina.titulo}" guardada en Supabase.`);
+      await cargarRutinasGuardadas();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar la rutina.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function guardarTodasLasRutinas() {
+    for (const rutina of rutinasIA) {
+      await guardarRutina(rutina);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-black text-white p-6 pb-28 font-sans max-w-md mx-auto">
       <header className="flex justify-between items-center mb-8">
@@ -79,6 +255,38 @@ export default function Dashboard() {
           <TrendingUp className="text-[#CCFF00] w-6 h-6" />
         </div>
       </header>
+
+      <section className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Cuenta</p>
+            <h2 className="text-lg font-bold">{user ? "Sesión activa" : "Guardar progreso"}</h2>
+            <p className="text-xs text-zinc-500 mt-1">{user ? user.email : "Inicia sesión para guardar rutinas en Supabase."}</p>
+          </div>
+          {user && (
+            <button onClick={cerrarSesion} className="rounded-full bg-zinc-900 p-3 text-zinc-400">
+              <LogOut className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        {!user && (
+          <div className="mt-4 grid gap-3">
+            <input
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              type="email"
+              placeholder="tu@email.com"
+              className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00]"
+            />
+            <button onClick={iniciarSesion} className="w-full rounded-2xl bg-white px-4 py-3 font-bold text-black">
+              Enviar magic link
+            </button>
+          </div>
+        )}
+
+        {authMessage && <p className="mt-3 text-sm text-[#CCFF00]">{authMessage}</p>}
+      </section>
 
       <section className="grid grid-cols-2 gap-4 mb-8">
         <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
@@ -166,22 +374,44 @@ export default function Dashboard() {
             {error}
           </div>
         )}
+        {successMessage && (
+          <div className="mt-4 rounded-2xl border border-lime-900/60 bg-lime-950/40 p-4 text-sm text-lime-200 inline-flex gap-2">
+            <CheckCircle2 className="h-5 w-5 shrink-0" /> {successMessage}
+          </div>
+        )}
       </section>
 
       {rutinasIA.length > 0 && (
         <section className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold">Rutina generada</h3>
-            <span className="text-xs text-zinc-500">{rutinasIA.length} días</span>
+            <button
+              onClick={guardarTodasLasRutinas}
+              disabled={isSaving || !user}
+              className="text-[#CCFF00] text-sm flex items-center gap-1 disabled:opacity-40"
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Guardar todo
+            </button>
           </div>
 
           <div className="grid gap-4">
             {rutinasIA.map((rutina, index) => (
               <article key={`${rutina.titulo}-${index}`} className="bg-zinc-950 border border-zinc-800 rounded-3xl p-4">
-                <div className="mb-4">
-                  <p className="text-xs text-[#CCFF00] font-bold uppercase">Día {index + 1}</p>
-                  <h4 className="text-xl font-black">{rutina.titulo}</h4>
-                  <p className="text-sm text-zinc-400 mt-1">{rutina.descripcion}</p>
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-[#CCFF00] font-bold uppercase">Día {index + 1}</p>
+                    <h4 className="text-xl font-black">{rutina.titulo}</h4>
+                    <p className="text-sm text-zinc-400 mt-1">{rutina.descripcion}</p>
+                  </div>
+                  <button
+                    onClick={() => guardarRutina(rutina)}
+                    disabled={isSaving || !user}
+                    className="rounded-full bg-zinc-900 p-3 text-[#CCFF00] disabled:opacity-40"
+                    title={user ? "Guardar rutina" : "Inicia sesión para guardar"}
+                  >
+                    {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                  </button>
                 </div>
 
                 <div className="grid gap-3">
@@ -209,13 +439,51 @@ export default function Dashboard() {
 
       <section className="mb-8">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold">Mis Rutinas</h3>
+          <h3 className="text-lg font-bold">Rutinas guardadas</h3>
+          <button onClick={cargarRutinasGuardadas} disabled={!user || isLoadingSaved} className="text-[#CCFF00] text-sm flex items-center gap-1 disabled:opacity-40">
+            {isLoadingSaved ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />}
+            Actualizar
+          </button>
+        </div>
+
+        {!user && <p className="text-sm text-zinc-500">Inicia sesión para ver tus rutinas guardadas.</p>}
+
+        {user && rutinasGuardadas.length === 0 && !isLoadingSaved && (
+          <p className="text-sm text-zinc-500">Aún no tienes rutinas guardadas.</p>
+        )}
+
+        <div className="grid gap-4">
+          {rutinasGuardadas.map((rutina) => (
+            <article key={rutina.id} className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h4 className="font-bold">{rutina.title}</h4>
+                  <p className="text-xs text-zinc-500 mt-1">{rutina.description}</p>
+                </div>
+                <Dumbbell className="h-5 w-5 text-[#CCFF00] shrink-0" />
+              </div>
+              <div className="mt-4 grid gap-2">
+                {(rutina.routine_exercises || []).map((item, index) => (
+                  <div key={`${rutina.id}-${index}`} className="flex items-center justify-between rounded-xl bg-zinc-950 px-3 py-2 text-xs">
+                    <span className="text-zinc-300">{item.exercises?.name || "Ejercicio"}</span>
+                    <span className="text-zinc-500">{item.target_sets || 3}x {item.target_reps || "10-12"}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">Rutinas sugeridas</h3>
           <button onClick={generarRutina} disabled={isGenerating} className="text-[#CCFF00] text-sm flex items-center gap-1 disabled:opacity-60">
             <Plus className="w-4 h-4" /> Nueva
           </button>
         </div>
         <div className="grid gap-4">
-          {routines.map((routine) => (
+          {fallbackRoutines.map((routine) => (
             <div key={routine.id} className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex items-center justify-between hover:border-zinc-600 transition-colors cursor-pointer group">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center group-hover:bg-[#CCFF00] group-hover:text-black transition-colors">
