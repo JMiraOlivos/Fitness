@@ -1,0 +1,180 @@
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { ArrowLeft, Loader2, TrendingUp } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+type ExerciseRef = { id: string; name: string; target_muscle: string; equipment: string };
+type WorkoutRef = { start_time: string };
+type SetLog = {
+  id: string;
+  set_number: number;
+  weight: number;
+  reps: number;
+  rpe: number | null;
+  exercises?: ExerciseRef | ExerciseRef[] | null;
+  workout_logs?: WorkoutRef | WorkoutRef[] | null;
+};
+
+function one<T>(value: T | T[] | null | undefined) {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+function volume(logs: SetLog[]) {
+  return logs.reduce((sum, log) => sum + Number(log.weight || 0) * Number(log.reps || 0), 0);
+}
+
+function estimatedOneRepMax(weight: number, reps: number) {
+  if (!weight || !reps) return 0;
+  return weight * (1 + reps / 30);
+}
+
+function dateLabel(value?: string) {
+  if (!value) return "Sin fecha";
+  return new Date(value).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+export default function ExerciseProgressDetailPage() {
+  const params = useParams<{ exerciseId: string }>();
+  const [user, setUser] = useState<User | null>(null);
+  const [logs, setLogs] = useState<SetLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const exercise = one(logs[0]?.exercises);
+  const sortedLogs = useMemo(() => {
+    return [...logs].sort((a, b) => {
+      const aWorkout = one(a.workout_logs);
+      const bWorkout = one(b.workout_logs);
+      return new Date(bWorkout?.start_time || 0).getTime() - new Date(aWorkout?.start_time || 0).getTime();
+    });
+  }, [logs]);
+
+  const totalVolume = useMemo(() => volume(logs), [logs]);
+  const maxWeight = useMemo(() => logs.reduce((max, log) => Math.max(max, Number(log.weight || 0)), 0), [logs]);
+  const bestOneRepMax = useMemo(() => {
+    return logs.reduce((max, log) => Math.max(max, estimatedOneRepMax(Number(log.weight || 0), Number(log.reps || 0))), 0);
+  }, [logs]);
+
+  useEffect(() => {
+    async function loadExercise() {
+      setIsLoading(true);
+      setError(null);
+
+      const { data: authData } = await supabase.auth.getUser();
+      setUser(authData.user);
+
+      if (!authData.user) {
+        setIsLoading(false);
+        return;
+      }
+
+      const { data, error: loadError } = await supabase
+        .from("set_logs")
+        .select(`
+          id,
+          set_number,
+          weight,
+          reps,
+          rpe,
+          exercises ( id, name, target_muscle, equipment ),
+          workout_logs ( start_time )
+        `)
+        .eq("exercise_id", params.exerciseId)
+        .limit(100);
+
+      if (loadError) setError(loadError.message);
+      else setLogs((data || []) as unknown as SetLog[]);
+
+      setIsLoading(false);
+    }
+
+    void loadExercise();
+  }, [params.exerciseId]);
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-black text-white p-6 max-w-md mx-auto flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#CCFF00]" />
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-black text-white p-6 max-w-md mx-auto">
+        <Link href="/auth" className="text-[#CCFF00] font-bold">Iniciar sesión</Link>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-black text-white p-6 pb-16 font-sans max-w-md mx-auto">
+      <Link href="/progreso" className="inline-flex items-center gap-2 text-sm text-zinc-400 mb-6">
+        <ArrowLeft className="h-4 w-4" /> Progreso
+      </Link>
+
+      <header className="mb-8">
+        <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Detalle ejercicio</p>
+        <h1 className="text-3xl font-black tracking-tight mt-1">{exercise?.name || "Ejercicio"}</h1>
+        <p className="text-sm text-zinc-400 mt-2">{exercise ? `${exercise.target_muscle} · ${exercise.equipment}` : "Series históricas"}</p>
+      </header>
+
+      {error && <div className="mb-6 rounded-2xl border border-red-900/60 bg-red-950/40 p-4 text-sm text-red-200">{error}</div>}
+
+      {logs.length === 0 && !error && (
+        <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5">
+          <h2 className="text-xl font-black">Sin registros</h2>
+          <p className="text-sm text-zinc-400 mt-2">Todavía no hay series registradas para este ejercicio.</p>
+        </section>
+      )}
+
+      {logs.length > 0 && (
+        <>
+          <section className="grid grid-cols-3 gap-3 mb-8">
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+              <p className="text-[10px] text-zinc-500 uppercase font-bold">Series</p>
+              <p className="text-xl font-black mt-1">{logs.length}</p>
+            </div>
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+              <p className="text-[10px] text-zinc-500 uppercase font-bold">Máx.</p>
+              <p className="text-xl font-black mt-1">{maxWeight}</p>
+            </div>
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+              <p className="text-[10px] text-zinc-500 uppercase font-bold">1RM</p>
+              <p className="text-xl font-black mt-1">{Math.round(bestOneRepMax)}</p>
+            </div>
+          </section>
+
+          <section className="mb-6 rounded-3xl border border-[#CCFF00]/40 bg-[#CCFF00]/10 p-4">
+            <div className="flex items-center gap-2 text-[#CCFF00]">
+              <TrendingUp className="h-5 w-5" />
+              <p className="text-xs uppercase font-bold tracking-wider">Volumen acumulado</p>
+            </div>
+            <p className="text-2xl font-black mt-2">{Math.round(totalVolume)} kg</p>
+          </section>
+
+          <section className="grid gap-3">
+            {sortedLogs.map((log) => {
+              const workout = one(log.workout_logs);
+              return (
+                <article key={log.id} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-black">{log.weight} kg x {log.reps} reps</p>
+                      <p className="text-xs text-zinc-500 mt-1">{dateLabel(workout?.start_time)} · Serie {log.set_number}</p>
+                    </div>
+                    {log.rpe && <p className="text-sm font-bold text-[#CCFF00]">RPE {log.rpe}</p>}
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+        </>
+      )}
+    </main>
+  );
+}
