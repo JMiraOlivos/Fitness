@@ -134,6 +134,17 @@ function getLastWorkoutLabel(workouts: MetricWorkout[]) {
   });
 }
 
+function shouldFallbackToLegacySave(error: { code?: string; message?: string } | null) {
+  const message = error?.message || "";
+
+  return (
+    error?.code === "PGRST202" ||
+    message.includes("save_ai_routine") ||
+    message.includes("Could not find the function") ||
+    message.includes("function public.save_ai_routine")
+  );
+}
+
 export default function Dashboard() {
   const [diasDisponibles, setDiasDisponibles] = useState("4");
   const [enfoque, setEnfoque] = useState("Hipertrofia upper/lower");
@@ -351,6 +362,37 @@ export default function Dashboard() {
     return exerciseRow.id as string;
   }
 
+  async function guardarRutinaLegacy(rutina: RutinaIA) {
+    const { data: routineRow, error: routineError } = await supabase
+      .from("routines")
+      .insert({
+        user_id: user?.id,
+        title: rutina.titulo,
+        description: rutina.descripcion,
+      })
+      .select("id")
+      .single();
+
+    if (routineError) throw routineError;
+    if (!routineRow?.id) throw new Error("No se pudo crear la rutina.");
+
+    for (let index = 0; index < rutina.ejercicios.length; index += 1) {
+      const ejercicio = rutina.ejercicios[index];
+      const exerciseId = await getOrCreateExercise(ejercicio);
+
+      const { error: relationError } = await supabase.from("routine_exercises").insert({
+        routine_id: routineRow.id,
+        exercise_id: exerciseId,
+        order_index: index + 1,
+        target_sets: ejercicio.seriesObjetivo,
+        target_reps: ejercicio.repeticionesObjetivo,
+        notes: ejercicio.notas,
+      });
+
+      if (relationError) throw relationError;
+    }
+  }
+
   async function guardarRutina(rutina: RutinaIA) {
     setError(null);
     setSuccessMessage(null);
@@ -363,33 +405,16 @@ export default function Dashboard() {
     setIsSaving(true);
 
     try {
-      const { data: routineRow, error: routineError } = await supabase
-        .from("routines")
-        .insert({
-          user_id: user.id,
-          title: rutina.titulo,
-          description: rutina.descripcion,
-        })
-        .select("id")
-        .single();
+      const { error: rpcError } = await supabase.rpc("save_ai_routine", {
+        p_routine: rutina,
+      });
 
-      if (routineError) throw routineError;
-      if (!routineRow?.id) throw new Error("No se pudo crear la rutina.");
-
-      for (let index = 0; index < rutina.ejercicios.length; index += 1) {
-        const ejercicio = rutina.ejercicios[index];
-        const exerciseId = await getOrCreateExercise(ejercicio);
-
-        const { error: relationError } = await supabase.from("routine_exercises").insert({
-          routine_id: routineRow.id,
-          exercise_id: exerciseId,
-          order_index: index + 1,
-          target_sets: ejercicio.seriesObjetivo,
-          target_reps: ejercicio.repeticionesObjetivo,
-          notes: ejercicio.notas,
-        });
-
-        if (relationError) throw relationError;
+      if (rpcError) {
+        if (shouldFallbackToLegacySave(rpcError)) {
+          await guardarRutinaLegacy(rutina);
+        } else {
+          throw rpcError;
+        }
       }
 
       setSuccessMessage(`Rutina "${rutina.titulo}" guardada en Supabase.`);
