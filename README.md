@@ -8,37 +8,20 @@ Aplicación móvil adaptativa construida con Next.js App Router, Tailwind CSS, S
 - React 18
 - TypeScript
 - Tailwind CSS
-- Supabase
+- Supabase Auth + Database
 - Gemini vía `@ai-sdk/google` y `ai`
 - `zod` para respuestas estructuradas
 - `lucide-react` para iconografía
 
-## Estructura
+## Funcionalidad actual
 
-```txt
-fitness-app/
-├── package.json
-├── tailwind.config.js
-├── postcss.config.js
-├── README.md
-├── .env.example
-├── supabase/
-│   └── schema.sql
-├── public/
-│   ├── icon.svg
-│   └── manifest.json
-└── src/
-    ├── lib/
-    │   └── supabase.ts
-    └── app/
-        ├── layout.tsx
-        ├── globals.css
-        ├── page.tsx
-        └── api/
-            └── ai/
-                └── generar-rutina/
-                    └── route.ts
-```
+- Dashboard mobile-first tipo PWA.
+- Generación de rutinas con Gemini.
+- Formulario para ajustar días disponibles, enfoque y restricciones.
+- Login con magic link de Supabase Auth.
+- Guardado de rutinas generadas en Supabase.
+- Lectura de rutinas guardadas por usuario.
+- RLS/policies para proteger datos por usuario.
 
 ## Configuración local
 
@@ -62,14 +45,38 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key_de_supabase
 
 ## Base de datos
 
-Ejecuta `supabase/schema.sql` en el SQL Editor de Supabase para crear las tablas principales:
+Si el proyecto Supabase está vacío, ejecuta primero:
 
-- `profiles`
-- `exercises`
-- `routines`
-- `routine_exercises`
-- `workout_logs`
-- `set_logs`
+```txt
+supabase/schema.sql
+```
+
+Si ya habías ejecutado el schema inicial, ejecuta después:
+
+```txt
+supabase/migrations/20260705_add_rls_and_routine_persistence.sql
+```
+
+La migración agrega:
+
+- Row Level Security en las tablas principales.
+- Policies para que cada usuario lea y escriba solo sus rutinas, entrenamientos y series.
+- Trigger `on_auth_user_created` para crear automáticamente un perfil en `public.profiles` cuando se registra un usuario.
+
+## Supabase Auth
+
+Para que el magic link funcione en producción:
+
+1. Entra a Supabase.
+2. Ve a `Authentication -> URL Configuration`.
+3. Agrega tu dominio de Vercel en `Site URL`.
+4. Agrega el mismo dominio en `Redirect URLs`.
+
+Ejemplo:
+
+```txt
+https://tu-app.vercel.app
+```
 
 ## Endpoint de IA
 
@@ -91,4 +98,6 @@ La respuesta queda validada por `zod` y contiene rutinas estructuradas listas pa
 
 1. Importa este repo en Vercel.
 2. Configura las variables de entorno.
-3. Deploy.
+3. Ejecuta el schema/migración en Supabase.
+4. Configura URLs de Auth en Supabase.
+5. Deploy o Redeploy.
