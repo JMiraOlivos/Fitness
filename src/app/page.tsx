@@ -105,10 +105,12 @@ export default function Dashboard() {
       return;
     }
 
+    const redirectTo = `${window.location.origin}/auth/callback`;
+
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: redirectTo,
       },
     });
 
