@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { BrainCircuit, CheckCircle2, Dumbbell, History, Loader2, LogOut, Plus, Save, Sparkles, TrendingUp } from "lucide-react";
+import { BrainCircuit, CheckCircle2, Dumbbell, History, Loader2, LogOut, Play, Plus, Save, Sparkles, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type EjercicioIA = {
@@ -215,7 +216,9 @@ export default function Dashboard() {
       if (routineError) throw routineError;
       if (!routineRow?.id) throw new Error("No se pudo crear la rutina.");
 
-      for (const [index, ejercicio] of rutina.ejercicios.entries()) {
+      for (let index = 0; index < rutina.ejercicios.length; index += 1) {
+        const ejercicio = rutina.ejercicios[index];
+
         const { data: exerciseRow, error: exerciseError } = await supabase
           .from("exercises")
           .insert({
@@ -309,6 +312,15 @@ export default function Dashboard() {
           <p className="text-xs text-zinc-500 uppercase font-bold">Racha Actual</p>
           <p className="text-2xl font-bold mt-1">12 <span className="text-[10px] text-zinc-400">días</span></p>
         </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 mb-8">
+        <Link href="/entrenar" className="rounded-2xl bg-[#CCFF00] px-4 py-3 font-black text-black inline-flex items-center justify-center gap-2">
+          <Play className="h-5 w-5" /> Entrenar
+        </Link>
+        <Link href="/historial" className="rounded-2xl bg-zinc-900 px-4 py-3 font-black text-white inline-flex items-center justify-center gap-2 border border-zinc-800">
+          <History className="h-5 w-5" /> Historial
+        </Link>
       </section>
 
       <section className="mb-8">
@@ -486,6 +498,12 @@ export default function Dashboard() {
                   );
                 })}
               </div>
+              <Link
+                href={`/entrenar/${rutina.id}`}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#CCFF00] px-4 py-3 font-black text-black"
+              >
+                <Play className="h-5 w-5" /> Entrenar esta rutina
+              </Link>
             </article>
           ))}
         </div>
@@ -519,18 +537,18 @@ export default function Dashboard() {
       </section>
 
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-zinc-950/80 backdrop-blur-md border-t border-zinc-800 px-8 py-4 flex justify-between items-center z-50">
-        <button className="text-[#CCFF00] flex flex-col items-center gap-1">
+        <Link href="/entrenar" className="text-[#CCFF00] flex flex-col items-center gap-1">
           <Dumbbell className="w-6 h-6" />
           <span className="text-[10px] font-bold">Entrenar</span>
-        </button>
-        <button className="text-zinc-500 flex flex-col items-center gap-1">
+        </Link>
+        <Link href="/" className="text-zinc-500 flex flex-col items-center gap-1">
           <TrendingUp className="w-6 h-6" />
-          <span className="text-[10px] font-bold">Progreso</span>
-        </button>
-        <button className="text-zinc-500 flex flex-col items-center gap-1">
+          <span className="text-[10px] font-bold">Dashboard</span>
+        </Link>
+        <Link href="/historial" className="text-zinc-500 flex flex-col items-center gap-1">
           <History className="w-6 h-6" />
           <span className="text-[10px] font-bold">Historial</span>
-        </button>
+        </Link>
       </nav>
     </div>
   );
