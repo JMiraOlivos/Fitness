@@ -130,7 +130,7 @@ export default function ProgresoPage() {
           reps,
           rpe,
           exercises ( id, name, target_muscle, equipment ),
-          workout_logs ( start_time )
+          workout_logs!inner ( start_time )
         `)
         .gte("workout_logs.start_time", ninetyDaysAgo.toISOString())
         .order("id", { ascending: false });
@@ -215,37 +215,41 @@ export default function ProgresoPage() {
 
       <section className="grid gap-4">
         {progress.map((item) => (
-          <article key={item.id} className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-black">{item.name}</h2>
-                <p className="text-xs text-zinc-500 mt-1">{item.targetMuscle} · {item.equipment} · último {formatDate(item.lastDate)}</p>
-              </div>
-              <Dumbbell className="h-6 w-6 text-[#CCFF00] shrink-0" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <div className="rounded-2xl bg-zinc-900 p-3">
-                <div className="flex items-center gap-2 text-zinc-500">
-                  <TrendingUp className="h-4 w-4" />
-                  <p className="text-[10px] uppercase font-bold">Volumen</p>
+          <Link key={item.id} href={`/progreso/${item.id}`} className="block">
+            <article className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-black">{item.name}</h2>
+                  <p className="text-xs text-zinc-500 mt-1">{item.targetMuscle} · {item.equipment} · último {formatDate(item.lastDate)}</p>
                 </div>
-                <p className="font-black mt-1">{Math.round(item.volume)} kg</p>
+                <Dumbbell className="h-6 w-6 text-[#CCFF00] shrink-0" />
               </div>
-              <div className="rounded-2xl bg-zinc-900 p-3">
-                <p className="text-[10px] text-zinc-500 uppercase font-bold">Series</p>
-                <p className="font-black mt-1">{item.sets}</p>
+
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="rounded-2xl bg-zinc-900 p-3">
+                  <div className="flex items-center gap-2 text-zinc-500">
+                    <TrendingUp className="h-4 w-4" />
+                    <p className="text-[10px] uppercase font-bold">Volumen</p>
+                  </div>
+                  <p className="font-black mt-1">{Math.round(item.volume)} kg</p>
+                </div>
+                <div className="rounded-2xl bg-zinc-900 p-3">
+                  <p className="text-[10px] text-zinc-500 uppercase font-bold">Series</p>
+                  <p className="font-black mt-1">{item.sets}</p>
+                </div>
+                <div className="rounded-2xl bg-zinc-900 p-3">
+                  <p className="text-[10px] text-zinc-500 uppercase font-bold">Peso máx.</p>
+                  <p className="font-black mt-1">{item.maxWeight} kg</p>
+                </div>
+                <div className="rounded-2xl bg-zinc-900 p-3">
+                  <p className="text-[10px] text-zinc-500 uppercase font-bold">1RM est.</p>
+                  <p className="font-black mt-1">{Math.round(item.estimatedOneRepMax)} kg</p>
+                </div>
               </div>
-              <div className="rounded-2xl bg-zinc-900 p-3">
-                <p className="text-[10px] text-zinc-500 uppercase font-bold">Peso máx.</p>
-                <p className="font-black mt-1">{item.maxWeight} kg</p>
-              </div>
-              <div className="rounded-2xl bg-zinc-900 p-3">
-                <p className="text-[10px] text-zinc-500 uppercase font-bold">1RM est.</p>
-                <p className="font-black mt-1">{Math.round(item.estimatedOneRepMax)} kg</p>
-              </div>
-            </div>
-          </article>
+
+              <p className="mt-4 text-xs font-bold text-[#CCFF00]">Ver detalle</p>
+            </article>
+          </Link>
         ))}
       </section>
     </main>
