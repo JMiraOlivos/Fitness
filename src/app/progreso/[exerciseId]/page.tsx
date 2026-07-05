@@ -19,6 +19,14 @@ type SetLog = {
   workout_logs?: WorkoutRef | WorkoutRef[] | null;
 };
 
+type TrendPoint = {
+  key: string;
+  label: string;
+  volume: number;
+  maxWeight: number;
+  sets: number;
+};
+
 function one<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
@@ -35,6 +43,40 @@ function estimatedOneRepMax(weight: number, reps: number) {
 function dateLabel(value?: string) {
   if (!value) return "Sin fecha";
   return new Date(value).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function shortDateLabel(value: string) {
+  return new Date(value).toLocaleDateString("es-CL", { day: "2-digit", month: "short" });
+}
+
+function dateKey(value?: string) {
+  if (!value) return "sin-fecha";
+  return new Date(value).toLocaleDateString("en-CA");
+}
+
+function buildTrend(logs: SetLog[]) {
+  const map = new Map<string, TrendPoint>();
+
+  for (const log of logs) {
+    const workout = one(log.workout_logs);
+    const key = dateKey(workout?.start_time);
+    const current = map.get(key) || {
+      key,
+      label: workout?.start_time ? shortDateLabel(workout.start_time) : "Sin fecha",
+      volume: 0,
+      maxWeight: 0,
+      sets: 0,
+    };
+
+    const weight = Number(log.weight || 0);
+    const reps = Number(log.reps || 0);
+    current.volume += weight * reps;
+    current.maxWeight = Math.max(current.maxWeight, weight);
+    current.sets += 1;
+    map.set(key, current);
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key)).slice(-8);
 }
 
 export default function ExerciseProgressDetailPage() {
@@ -58,6 +100,8 @@ export default function ExerciseProgressDetailPage() {
   const bestOneRepMax = useMemo(() => {
     return logs.reduce((max, log) => Math.max(max, estimatedOneRepMax(Number(log.weight || 0), Number(log.reps || 0))), 0);
   }, [logs]);
+  const trend = useMemo(() => buildTrend(logs), [logs]);
+  const maxTrendVolume = useMemo(() => Math.max(...trend.map((point) => point.volume), 1), [trend]);
 
   useEffect(() => {
     async function loadExercise() {
@@ -155,6 +199,23 @@ export default function ExerciseProgressDetailPage() {
               <p className="text-xs uppercase font-bold tracking-wider">Volumen acumulado</p>
             </div>
             <p className="text-2xl font-black mt-2">{Math.round(totalVolume)} kg</p>
+          </section>
+
+          <section className="mb-6 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+            <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Tendencia de volumen</p>
+            <div className="mt-4 grid gap-3">
+              {trend.map((point) => (
+                <div key={point.key}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-bold text-zinc-300">{point.label}</span>
+                    <span className="text-zinc-500">{Math.round(point.volume)} kg · {point.sets} series</span>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-zinc-900">
+                    <div className="h-full rounded-full bg-[#CCFF00]" style={{ width: `${Math.max(8, (point.volume / maxTrendVolume) * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
 
           <section className="grid gap-3">
