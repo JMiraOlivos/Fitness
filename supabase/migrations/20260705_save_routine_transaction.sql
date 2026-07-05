@@ -99,6 +99,44 @@ begin
 end;
 $$;
 
+-- Compatibility wrapper for the current dashboard payload shape.
+create or replace function public.save_ai_routine(p_routine jsonb)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  exercises_payload jsonb;
+begin
+  if p_routine is null or jsonb_typeof(p_routine) <> 'object' then
+    raise exception 'Payload de rutina inválido.';
+  end if;
+
+  select coalesce(jsonb_agg(
+    jsonb_build_object(
+      'orderIndex', exercise_order,
+      'name', btrim(coalesce(exercise_item->>'nombre', '')),
+      'targetMuscle', btrim(coalesce(exercise_item->>'musculoObjetivo', '')),
+      'equipment', btrim(coalesce(exercise_item->>'equipamiento', '')),
+      'targetSets', exercise_item->>'seriesObjetivo',
+      'targetReps', exercise_item->>'repeticionesObjetivo',
+      'notes', exercise_item->>'notas'
+    )
+  ), '[]'::jsonb)
+  into exercises_payload
+  from jsonb_array_elements(coalesce(p_routine->'ejercicios', '[]'::jsonb))
+  with ordinality as payload(exercise_item, exercise_order);
+
+  return public.save_routine_with_exercises(
+    p_routine->>'titulo',
+    p_routine->>'descripcion',
+    exercises_payload
+  );
+end;
+$$;
+
 grant execute on function public.save_routine_with_exercises(text, text, jsonb) to authenticated;
+grant execute on function public.save_ai_routine(jsonb) to authenticated;
 
 commit;
