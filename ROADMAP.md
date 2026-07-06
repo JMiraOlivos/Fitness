@@ -205,6 +205,18 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 
 ---
 
+## Gestión de rutinas guardadas: borrar y regenerar con IA ✅ (añadido fuera de fase, 2026-07-06)
+
+Pedido directo del usuario, no estaba en el roadmap original.
+
+- ✅ Borrar rutina: botón de papelera + confirmación inline en las tarjetas de "Rutinas guardadas" (dashboard) y de `/entrenar`, vía `POST /api/routines/delete`. En este modelo de datos cada rutina guardada ya es un día individual (Gemini genera una semana como varias tarjetas de "Día N", y cada una se guarda como una fila `routines` independiente sin relación entre sí) — así que "borrar la rutina completa" y "borrar un día específico" son la misma operación; no hizo falta introducir un concepto nuevo de "programa"/agrupación de días.
+- ✅ Regenerar un día con IA: botón "Regenerar con IA" en `/entrenar/[routineId]` (deshabilitado mientras hay un entrenamiento en curso), con campo de instrucciones opcional. Llama a `POST /api/ai/regenerar-dia`, que le da a Gemini el mismo contexto que el generador principal (perfil, desempeño reciente) más los ejercicios actuales del día, y persiste el resultado con la nueva RPC `regenerate_ai_routine_day` — mantiene el mismo `routine_id` (no rompe la URL ni las referencias de `workout_logs.routine_id`).
+- Migración `20260709_regenerate_routine_day_rpc.sql`: añade `regenerate_routine_day`/`regenerate_ai_routine_day` y extrae a un helper compartido (`_insert_routine_exercises`) el loop de dedup-e-inserción de ejercicios que antes estaba solo en `save_routine_with_exercises`, para no duplicarlo. Verificado contra una instancia local de Postgres simulando RLS como dos usuarios distintos: el dueño puede regenerar/borrar su rutina, un usuario ajeno no puede hacer ninguna de las dos cosas.
+
+> Nota de verificación: igual que en fases anteriores, no se pudo probar el flujo completo (login real + click en borrar/regenerar) contra el proyecto de Supabase real por el bloqueo de egress del sandbox — se verificó por revisión de código, `tsc`/`lint`/`build` limpios, y las RPCs contra Postgres local con RLS simulada.
+
+---
+
 ## Cobertura de tests
 
 Ampliar más allá del esqueleto de CI de la Fase 6: tests unitarios para volumen/1RM/racha y tests de integración para el RPC de guardado de rutinas. Hacerlo después de que el refactor de la Fase 6 se asiente — escribir tests contra código que está por rearquitecturarse es esfuerzo perdido.
