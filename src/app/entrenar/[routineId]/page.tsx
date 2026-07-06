@@ -330,6 +330,33 @@ export default function EntrenarPage() {
     });
   }
 
+  function marcarCompletado(routineExerciseId: string) {
+    const wasCompleted = completedExerciseIds.has(routineExerciseId);
+
+    setCompletedExerciseIds((current) => {
+      const next = new Set(current);
+      if (wasCompleted) {
+        next.delete(routineExerciseId);
+      } else {
+        next.add(routineExerciseId);
+      }
+      return next;
+    });
+
+    if (wasCompleted) return;
+
+    const currentIndex = routineExercises.findIndex((item) => item.id === routineExerciseId);
+    const nextItem = routineExercises
+      .slice(currentIndex + 1)
+      .find((item) => item.id !== routineExerciseId && !completedExerciseIds.has(item.id));
+
+    if (nextItem) {
+      requestAnimationFrame(() => {
+        exerciseRefs.current[nextItem.id]?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }
+
   async function abrirSustitucion(item: RoutineExerciseRow) {
     const exercise = one(item.exercises);
     if (!exercise) return;
@@ -737,9 +764,18 @@ export default function EntrenarPage() {
           const currentInput = inputs[item.id] || defaultInput();
           const localLogs = exercise?.id ? setLogs[exercise.id] || [] : [];
           const suggestion = exercise?.id ? suggestions[exercise.id] : undefined;
+          const isCompleted = completedExerciseIds.has(item.id);
 
           return (
-            <article key={item.id} className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+            <article
+              key={item.id}
+              ref={(el) => {
+                exerciseRefs.current[item.id] = el;
+              }}
+              className={`rounded-3xl border p-4 transition-opacity ${
+                isCompleted ? "border-zinc-800 bg-zinc-950/60 opacity-60" : "border-zinc-800 bg-zinc-950"
+              }`}
+            >
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs text-[#CCFF00] font-bold uppercase">Ejercicio {item.order_index}</p>
@@ -747,7 +783,19 @@ export default function EntrenarPage() {
                   <p className="text-xs text-zinc-500 mt-1">{exercise?.target_muscle || "Músculo"} • {exercise?.equipment || "Equipo"}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <Dumbbell className="h-5 w-5 text-[#CCFF00]" />
+                  <button
+                    type="button"
+                    onClick={() => marcarCompletado(item.id)}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-400"
+                  >
+                    {isCompleted ? (
+                      <>
+                        <CheckCircle className="h-5 w-5 text-[#CCFF00]" /> Completado
+                      </>
+                    ) : (
+                      <Dumbbell className="h-5 w-5 text-[#CCFF00]" />
+                    )}
+                  </button>
                   <button
                     type="button"
                     onClick={() => (substitutingItemId === item.id ? cerrarSustitucion() : void abrirSustitucion(item))}
