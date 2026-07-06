@@ -297,6 +297,19 @@ export type Database = {
         };
         Returns: string;
       };
+      regenerate_routine_day: {
+        Args: {
+          p_routine_id: string;
+          routine_title: string;
+          routine_description: string | null;
+          exercises_payload: Json;
+        };
+        Returns: undefined;
+      };
+      regenerate_ai_routine_day: {
+        Args: { p_routine_id: string; p_routine: Json };
+        Returns: undefined;
+      };
     };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;

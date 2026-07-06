@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Dumbbell, Loader2, Play } from "lucide-react";
+import { ArrowLeft, Dumbbell, Loader2, Play, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/components/SessionProvider";
+import { authFetch } from "@/lib/authFetch";
 
 type RoutineListItem = {
   id: string;
@@ -19,6 +20,8 @@ export default function EntrenarIndexPage() {
   const [routines, setRoutines] = useState<RoutineListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (isSessionLoading) return;
@@ -54,6 +57,21 @@ export default function EntrenarIndexPage() {
 
     void load();
   }, [user, isSessionLoading]);
+
+  async function borrarRutina(routine: RoutineListItem) {
+    setError(null);
+    setIsDeleting(true);
+
+    try {
+      await authFetch("/api/routines/delete", { routineId: routine.id });
+      setRoutines((current) => current.filter((item) => item.id !== routine.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo borrar la rutina.");
+    } finally {
+      setIsDeleting(false);
+      setConfirmingDeleteId(null);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-black text-white p-6 pb-16 font-sans max-w-md mx-auto">
@@ -109,8 +127,37 @@ export default function EntrenarIndexPage() {
                 <p className="text-sm text-zinc-400 mt-1">{routine.description || "Rutina guardada"}</p>
                 <p className="text-xs text-zinc-500 mt-2">{routine.routine_exercises?.length || 0} ejercicios</p>
               </div>
-              <Dumbbell className="h-6 w-6 text-[#CCFF00] shrink-0" />
+              <div className="flex items-center gap-2 shrink-0">
+                <Dumbbell className="h-6 w-6 text-[#CCFF00]" />
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDeleteId(confirmingDeleteId === routine.id ? null : routine.id)}
+                  className="rounded-full bg-zinc-900 p-2 text-zinc-500"
+                  aria-label="Borrar rutina"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
+
+            {confirmingDeleteId === routine.id && (
+              <div className="mt-3 rounded-2xl border border-red-900/60 bg-red-950/30 p-3 text-xs text-red-200">
+                <p>¿Borrar esta rutina? Esta acción no se puede deshacer.</p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => void borrarRutina(routine)}
+                    className="flex-1 rounded-xl bg-red-500/90 py-2 font-bold text-black disabled:opacity-50"
+                  >
+                    {isDeleting ? "Borrando..." : "Sí, borrar"}
+                  </button>
+                  <button type="button" onClick={() => setConfirmingDeleteId(null)} className="flex-1 rounded-xl bg-zinc-900 py-2 font-bold text-zinc-300">
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
 
             <Link
               href={`/entrenar/${routine.id}`}

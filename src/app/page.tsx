@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { BrainCircuit, CheckCircle2, Dumbbell, History, Loader2, LogOut, Play, Save, Sparkles, TrendingUp, UserCog } from "lucide-react";
+import { BrainCircuit, CheckCircle2, Dumbbell, History, Loader2, LogOut, Play, Save, Sparkles, Trash2, TrendingUp, UserCog } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
@@ -126,6 +126,8 @@ export default function Dashboard() {
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const precargarPerfil = useCallback(async () => {
     if (!user) return;
@@ -292,6 +294,24 @@ export default function Dashboard() {
     }
   }
 
+  async function borrarRutina(rutina: RutinaGuardada) {
+    setError(null);
+    setSuccessMessage(null);
+    setIsDeleting(true);
+
+    try {
+      await authFetch("/api/routines/delete", { routineId: rutina.id });
+
+      setRutinasGuardadas((current) => current.filter((item) => item.id !== rutina.id));
+      setSuccessMessage(`Rutina "${rutina.title}" borrada.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo borrar la rutina.");
+    } finally {
+      setIsDeleting(false);
+      setConfirmingDeleteId(null);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-black text-white p-6 pb-28 font-sans max-w-md mx-auto">
       <header className="flex items-center justify-between mb-8">
@@ -432,8 +452,38 @@ export default function Dashboard() {
                   <h4 className="font-black text-xl">{rutina.title}</h4>
                   <p className="text-xs text-zinc-500 mt-1">{rutina.description}</p>
                 </div>
-                <Dumbbell className="h-5 w-5 text-[#CCFF00] shrink-0" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <Dumbbell className="h-5 w-5 text-[#CCFF00]" />
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDeleteId(confirmingDeleteId === rutina.id ? null : rutina.id)}
+                    className="rounded-full bg-zinc-900 p-2 text-zinc-500"
+                    aria-label="Borrar rutina"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
+
+              {confirmingDeleteId === rutina.id && (
+                <div className="mt-3 rounded-2xl border border-red-900/60 bg-red-950/30 p-3 text-xs text-red-200">
+                  <p>¿Borrar esta rutina? Esta acción no se puede deshacer.</p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={() => void borrarRutina(rutina)}
+                      className="flex-1 rounded-xl bg-red-500/90 py-2 font-bold text-black disabled:opacity-50"
+                    >
+                      {isDeleting ? "Borrando..." : "Sí, borrar"}
+                    </button>
+                    <button type="button" onClick={() => setConfirmingDeleteId(null)} className="flex-1 rounded-xl bg-zinc-900 py-2 font-bold text-zinc-300">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-4 grid gap-2">
                 {(rutina.routine_exercises || []).slice(0, 5).map((item, index) => {
                   const exercise = one(item.exercises);

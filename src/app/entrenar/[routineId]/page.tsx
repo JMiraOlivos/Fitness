@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, CheckCircle, Dumbbell, Loader2, Play, Plus, Repeat, Sparkles, Square, Timer, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, CheckCircle2, CheckCircle, Dumbbell, Loader2, Play, Plus, Repeat, Sparkles, Square, Timer, Wand2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
@@ -168,6 +168,9 @@ export default function EntrenarPage() {
   const [isSubstituting, setIsSubstituting] = useState(false);
   const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
   const [completedExerciseIds, setCompletedExerciseIds] = useState<Set<string>>(new Set());
+  const [showRegeneratePanel, setShowRegeneratePanel] = useState(false);
+  const [regenerateInstructions, setRegenerateInstructions] = useState("");
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const exerciseRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
@@ -184,17 +187,46 @@ export default function EntrenarPage() {
     return [...(routine?.routine_exercises || [])].sort((a, b) => a.order_index - b.order_index);
   }, [routine]);
 
-  useEffect(() => {
-    if (isSessionLoading) return;
+  const cargarSugerencias = useCallback(async (userId: string, exerciseIds: string[]) => {
+    const { data: historyRows, error: historyError } = await supabase
+      .from("set_logs")
+      .select("exercise_id, workout_log_id, weight, reps, rpe, is_warmup, created_at, workout_logs!inner(user_id)")
+      .in("exercise_id", exerciseIds)
+      .eq("workout_logs.user_id", userId)
+      .order("created_at", { ascending: false });
 
-    if (!user) {
-      setIsLoading(false);
+    if (historyError || !historyRows) {
       return;
     }
 
-    const userId = user.id;
+    const lastWorkoutByExercise: Record<string, string> = {};
+    const sessionsByExercise: Record<string, HistorySetRow[]> = {};
 
-    async function bootstrap() {
+    for (const row of historyRows as unknown as HistorySetRow[]) {
+      const currentWorkoutLogId = lastWorkoutByExercise[row.exercise_id];
+
+      if (!currentWorkoutLogId) {
+        lastWorkoutByExercise[row.exercise_id] = row.workout_log_id;
+        sessionsByExercise[row.exercise_id] = [row];
+      } else if (currentWorkoutLogId === row.workout_log_id) {
+        sessionsByExercise[row.exercise_id].push(row);
+      }
+    }
+
+    const nextSuggestions: Record<string, ExerciseSuggestion> = {};
+
+    for (const exerciseId of Object.keys(sessionsByExercise)) {
+      const suggestion = buildSuggestion(sessionsByExercise[exerciseId]);
+      if (suggestion) {
+        nextSuggestions[exerciseId] = suggestion;
+      }
+    }
+
+    setSuggestions(nextSuggestions);
+  }, []);
+
+  const cargarRutina = useCallback(
+    async (userId: string) => {
       setIsLoading(true);
       setError(null);
 
@@ -239,48 +271,20 @@ export default function EntrenarPage() {
       }
 
       setIsLoading(false);
+    },
+    [routineId, cargarSugerencias]
+  );
+
+  useEffect(() => {
+    if (isSessionLoading) return;
+
+    if (!user) {
+      setIsLoading(false);
+      return;
     }
 
-    async function cargarSugerencias(userId: string, exerciseIds: string[]) {
-      const { data: historyRows, error: historyError } = await supabase
-        .from("set_logs")
-        .select("exercise_id, workout_log_id, weight, reps, rpe, is_warmup, created_at, workout_logs!inner(user_id)")
-        .in("exercise_id", exerciseIds)
-        .eq("workout_logs.user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (historyError || !historyRows) {
-        return;
-      }
-
-      const lastWorkoutByExercise: Record<string, string> = {};
-      const sessionsByExercise: Record<string, HistorySetRow[]> = {};
-
-      for (const row of historyRows as unknown as HistorySetRow[]) {
-        const currentWorkoutLogId = lastWorkoutByExercise[row.exercise_id];
-
-        if (!currentWorkoutLogId) {
-          lastWorkoutByExercise[row.exercise_id] = row.workout_log_id;
-          sessionsByExercise[row.exercise_id] = [row];
-        } else if (currentWorkoutLogId === row.workout_log_id) {
-          sessionsByExercise[row.exercise_id].push(row);
-        }
-      }
-
-      const nextSuggestions: Record<string, ExerciseSuggestion> = {};
-
-      for (const exerciseId of Object.keys(sessionsByExercise)) {
-        const suggestion = buildSuggestion(sessionsByExercise[exerciseId]);
-        if (suggestion) {
-          nextSuggestions[exerciseId] = suggestion;
-        }
-      }
-
-      setSuggestions(nextSuggestions);
-    }
-
-    void bootstrap();
-  }, [routineId, user, isSessionLoading]);
+    void cargarRutina(user.id);
+  }, [user, isSessionLoading, cargarRutina]);
 
   function updateInput(routineExerciseId: string, patch: Partial<SetInput>) {
     setInputs((current) => ({
@@ -419,6 +423,29 @@ export default function EntrenarPage() {
 
     setSuccessMessage(`${one(item.exercises)?.name || "Ejercicio"} sustituido por ${nuevoEjercicio.name}.`);
     cerrarSustitucion();
+  }
+
+  async function regenerarDia() {
+    if (!user) return;
+
+    setError(null);
+    setSuccessMessage(null);
+    setIsRegenerating(true);
+
+    try {
+      await authFetch("/api/ai/regenerar-dia", { routineId, instrucciones: regenerateInstructions });
+
+      await cargarRutina(user.id);
+      setCompletedExerciseIds(new Set());
+      setInputs({});
+      setShowRegeneratePanel(false);
+      setRegenerateInstructions("");
+      setSuccessMessage("Día regenerado con IA.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo regenerar el día.");
+    } finally {
+      setIsRegenerating(false);
+    }
   }
 
   async function ensureWorkoutLog() {
@@ -694,9 +721,55 @@ export default function EntrenarPage() {
       </Link>
 
       <header className="mb-6">
-        <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Entrenamiento activo</p>
-        <h1 className="text-3xl font-black tracking-tight mt-1">{routine.title}</h1>
-        <p className="text-sm text-zinc-400 mt-2">{routine.description || "Registra peso, repeticiones y RPE por serie."}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Entrenamiento activo</p>
+            <h1 className="text-3xl font-black tracking-tight mt-1">{routine.title}</h1>
+            <p className="text-sm text-zinc-400 mt-2">{routine.description || "Registra peso, repeticiones y RPE por serie."}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowRegeneratePanel((current) => !current)}
+            disabled={Boolean(workoutLogId)}
+            title={workoutLogId ? "Finaliza o descarta el entrenamiento en curso para regenerar el día" : undefined}
+            className="shrink-0 rounded-full bg-zinc-900 p-3 text-[#CCFF00] disabled:opacity-30"
+            aria-label="Regenerar día con IA"
+          >
+            <Wand2 className="h-5 w-5" />
+          </button>
+        </div>
+
+        {showRegeneratePanel && (
+          <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+            <p className="text-xs uppercase font-bold text-zinc-400 mb-2">Regenerar este día con IA</p>
+            <p className="text-xs text-zinc-500 mb-3">Reemplaza los ejercicios de este día. El título y la rutina se mantienen en la misma URL.</p>
+            <textarea
+              value={regenerateInstructions}
+              onChange={(event) => setRegenerateInstructions(event.target.value)}
+              rows={2}
+              placeholder="Opcional: ej. más énfasis en espalda, evitar sentadilla"
+              className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-[#CCFF00] resize-none"
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                disabled={isRegenerating}
+                onClick={() => void regenerarDia()}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#CCFF00] py-2 text-sm font-black text-black disabled:opacity-50"
+              >
+                {isRegenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                {isRegenerating ? "Regenerando..." : "Regenerar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRegeneratePanel(false)}
+                className="flex-1 rounded-2xl bg-zinc-900 py-2 text-sm font-bold text-zinc-300"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {restSecondsLeft !== null && (
