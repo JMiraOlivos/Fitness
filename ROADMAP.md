@@ -169,12 +169,12 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 
 **Objetivo:** que la app deje de ser un logger manual sin ciencia del entrenamiento y empiece a razonar con datos reales del usuario.
 
-### Alcance funcional — fundamentos de datos (requiere migraciones)
+### Alcance funcional — fundamentos de datos (requiere migraciones) ✅ (completa, 2026-07-06)
 
-- Taxonomía estandarizada de grupos musculares/equipo (hoy `target_muscle`/`equipment` son texto libre generado por la IA en cada llamada, lo que impide agregar volumen semanal por grupo muscular de forma confiable).
-- Flag de serie de calentamiento (`set_type`/`is_warmup`) en `set_logs`, para no contaminar volumen/1RM/RPE promedio.
-- Perfil de usuario persistente: objetivos, lesiones, preferencias reales en `profiles` (reemplaza el texto libre retipeado en cada generación, y es donde debe vivir la corrección real del bug de la Fase 0).
-- Granularidad de RPE (medios puntos o alternativa RIR) en `set_logs.rpe`.
+- ✅ Taxonomía estandarizada de grupos musculares/equipo: 12 grupos musculares + `General` de respaldo, 5 tipos de equipo + `Otro` de respaldo (`src/lib/exerciseTaxonomy.ts`), con CHECK constraints en `exercises` y datos existentes normalizados/deduplicados vía migración.
+- ✅ Flag de serie de calentamiento (`set_logs.is_warmup`), excluida de volumen/1RM/RPE promedio y de las sugerencias "igual que la vez pasada" en `/entrenar/[routineId]`.
+- ✅ Perfil de usuario persistente (`profiles.training_goal/injury_notes/equipment_available/experience_level`), con pantalla `/perfil` y wireado a `generar-rutina`: las lesiones persistentes ahora siempre viajan al prompt de Gemini, sin depender de que el usuario las retipee — esta es la corrección real del bug de la Fase 0.
+- ✅ Granularidad de RPE: `set_logs.rpe` pasó a `numeric(3,1)`, permite medios puntos (7.5, 8.5...) en vez de solo enteros.
 
 ### Alcance funcional — features visibles (dependen de lo anterior)
 
@@ -218,6 +218,6 @@ Los ejercicios globales (`owner_id is null`, ver Fase 6) se crean solo a través
 
 1. ~~**Fase 0**~~ — ✅ completa: prompt hardcodeado quitado, docs de auth alineadas, código muerto borrado, migraciones RPC consolidadas, guard de 1RM agregado.
 2. ~~**Fase 6**~~ — ✅ completa: `database.types.ts`, proveedor de sesión, writes críticos movidos a API routes, ejercicios globales/personales separados, paginación, CI, RLS revisada.
-3. **Fase 8 (fundamentos de datos)** — taxonomía de grupos musculares, flag de calentamiento, perfil persistente, granularidad de RPE.
-4. **Fase 5 + Fase 8 (features visibles)** — ~~timer de descanso~~ y ~~"igual que la vez pasada"~~ se pueden adelantar en paralelo; "igual que la vez pasada" ya está ✅ hecho. El resto de Fase 8 sigue a sus fundamentos de datos.
+3. ~~**Fase 8 (fundamentos de datos)**~~ — ✅ completa: taxonomía de grupos musculares, flag de calentamiento, perfil persistente wireado a `generar-rutina`, granularidad de RPE.
+4. **Fase 5 + Fase 8 (features visibles)** — ~~timer de descanso~~ y ~~"igual que la vez pasada"~~ se pueden adelantar en paralelo; "igual que la vez pasada" ya está ✅ hecho. El resto de Fase 5 (botones rápidos, autoscroll, marcar ejercicio completado) y las features visibles de Fase 8 (volumen por grupo muscular, periodización real, insight con tendencia histórica, registro de peso corporal, sustitución de ejercicio, cues técnicos, mesociclos) ya tienen sus fundamentos listos.
 5. **Fase 7** — PWA, al final.
