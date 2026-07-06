@@ -24,6 +24,7 @@ type SetLog = {
   weight: number;
   reps: number;
   rpe: number | null;
+  is_warmup: boolean;
   exercises?: ExerciseRef | ExerciseRef[] | null;
   workout_logs?: WorkoutRef | WorkoutRef[] | null;
 };
@@ -45,6 +46,8 @@ function buildProgress(setLogs: SetLog[]) {
   const map = new Map<string, ExerciseProgress>();
 
   for (const setLog of setLogs) {
+    if (setLog.is_warmup) continue;
+
     const exercise = one(setLog.exercises);
     const workout = one(setLog.workout_logs);
 
@@ -123,6 +126,7 @@ export default function ProgresoPage() {
           weight,
           reps,
           rpe,
+          is_warmup,
           exercises ( id, name, target_muscle, equipment ),
           workout_logs!inner ( start_time )
         `)

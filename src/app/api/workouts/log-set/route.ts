@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Inicia sesión para registrar series." }, { status: 401 });
   }
 
-  const { workoutLogId, exerciseId, setNumber, weight, reps, rpe } = await req.json();
+  const { workoutLogId, exerciseId, setNumber, weight, reps, rpe, isWarmup } = await req.json();
 
   if (!workoutLogId || !exerciseId) {
     return Response.json({ error: "Falta el entrenamiento o el ejercicio." }, { status: 400 });
@@ -36,8 +36,9 @@ export async function POST(req: Request) {
       weight,
       reps,
       rpe: rpe ?? null,
+      is_warmup: Boolean(isWarmup),
     })
-    .select("id, set_number, weight, reps, rpe")
+    .select("id, set_number, weight, reps, rpe, is_warmup")
     .single();
 
   if (error) {

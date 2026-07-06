@@ -16,6 +16,7 @@ type SetLog = {
   weight: number;
   reps: number;
   rpe: number | null;
+  is_warmup: boolean;
   exercises?: ExerciseRef | ExerciseRef[] | null;
 };
 type Workout = {
@@ -45,8 +46,9 @@ export default function WorkoutDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const setLogs = useMemo(() => [...(workout?.set_logs || [])].sort((a, b) => a.set_number - b.set_number), [workout]);
+  const workingSetLogs = useMemo(() => setLogs.filter((log) => !log.is_warmup), [setLogs]);
   const routine = one(workout?.routines);
-  const totalVolume = volume(setLogs);
+  const totalVolume = volume(workingSetLogs);
 
   useEffect(() => {
     if (isSessionLoading) return;
@@ -73,6 +75,7 @@ export default function WorkoutDetailPage() {
             weight,
             reps,
             rpe,
+            is_warmup,
             exercises ( name, target_muscle, equipment )
           )
         `)
@@ -138,7 +141,7 @@ export default function WorkoutDetailPage() {
         </div>
         <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
           <p className="text-xs text-zinc-500 uppercase font-bold">Series</p>
-          <p className="text-xl font-black mt-1">{setLogs.length}</p>
+          <p className="text-xl font-black mt-1">{workingSetLogs.length}</p>
         </div>
       </section>
 
@@ -152,7 +155,10 @@ export default function WorkoutDetailPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="font-black">{exercise?.name || "Ejercicio"}</h2>
-                  <p className="text-xs text-zinc-500">Serie {setLog.set_number} · {exercise?.target_muscle || "Músculo"}</p>
+                  <p className="text-xs text-zinc-500">
+                    Serie {setLog.set_number} · {exercise?.target_muscle || "Músculo"}
+                    {setLog.is_warmup && <span className="text-[#CCFF00]"> · Calentamiento</span>}
+                  </p>
                 </div>
                 <p className="text-sm font-bold text-[#CCFF00]">{setLog.weight} kg / {setLog.reps} reps</p>
               </div>

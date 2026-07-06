@@ -190,6 +190,7 @@ export type Database = {
           weight: number;
           reps: number;
           rpe: number | null;
+          is_warmup: boolean;
           created_at: string;
         };
         Insert: {
@@ -200,6 +201,7 @@ export type Database = {
           weight: number;
           reps: number;
           rpe?: number | null;
+          is_warmup?: boolean;
           created_at?: string;
         };
         Update: {
@@ -210,6 +212,7 @@ export type Database = {
           weight?: number;
           reps?: number;
           rpe?: number | null;
+          is_warmup?: boolean;
           created_at?: string;
         };
         Relationships: [

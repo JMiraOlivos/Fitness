@@ -51,6 +51,7 @@ type RutinaGuardada = {
 type MetricSetLog = {
   weight: number | null;
   reps: number | null;
+  is_warmup: boolean;
 };
 
 type MetricWorkout = {
@@ -59,6 +60,10 @@ type MetricWorkout = {
   end_time: string | null;
   set_logs?: MetricSetLog[];
 };
+
+function getWorkingSets(setLogs?: MetricSetLog[]) {
+  return (setLogs || []).filter((setLog) => !setLog.is_warmup);
+}
 
 type DashboardMetrics = {
   weeklyVolume: number;
@@ -77,7 +82,7 @@ const initialMetrics: DashboardMetrics = {
 };
 
 function getWorkoutVolume(setLogs?: MetricSetLog[]) {
-  return (setLogs || []).reduce((sum, setLog) => sum + Number(setLog.weight || 0) * Number(setLog.reps || 0), 0);
+  return getWorkingSets(setLogs).reduce((sum, setLog) => sum + Number(setLog.weight || 0) * Number(setLog.reps || 0), 0);
 }
 
 function getLocalDateKey(value: string | Date) {
@@ -184,7 +189,8 @@ export default function Dashboard() {
         end_time,
         set_logs (
           weight,
-          reps
+          reps,
+          is_warmup
         )
       `)
       .gte("start_time", thirtyDaysAgo.toISOString())
@@ -203,7 +209,7 @@ export default function Dashboard() {
     const weeklyWorkouts = workouts.filter((workout) => new Date(workout.start_time) >= sevenDaysAgo);
     const completedWeeklyWorkouts = weeklyWorkouts.filter((workout) => workout.end_time);
     const weeklyVolume = weeklyWorkouts.reduce((sum, workout) => sum + getWorkoutVolume(workout.set_logs), 0);
-    const weeklySets = weeklyWorkouts.reduce((sum, workout) => sum + (workout.set_logs?.length || 0), 0);
+    const weeklySets = weeklyWorkouts.reduce((sum, workout) => sum + getWorkingSets(workout.set_logs).length, 0);
 
     setMetrics({
       weeklyVolume,

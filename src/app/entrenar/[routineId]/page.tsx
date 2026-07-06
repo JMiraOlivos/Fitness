@@ -36,6 +36,7 @@ type SetInput = {
   weight: string;
   reps: string;
   rpe: string;
+  isWarmup: boolean;
 };
 
 type LocalSetLog = {
@@ -44,6 +45,7 @@ type LocalSetLog = {
   weight: number;
   reps: number;
   rpe: number | null;
+  is_warmup: boolean;
 };
 
 type WorkoutInsightResponse = {
@@ -60,6 +62,7 @@ type HistorySetRow = {
   weight: number;
   reps: number;
   rpe: number | null;
+  is_warmup: boolean;
   created_at: string;
 };
 
@@ -77,25 +80,31 @@ function defaultInput(): SetInput {
     weight: "",
     reps: "",
     rpe: "8",
+    isWarmup: false,
   };
 }
 
+// Warmup sets are logged but excluded from volume/1RM/RPE-average so they don't
+// understate how hard the working sets actually were.
 function getVolume(logs: LocalSetLog[]) {
-  return logs.reduce((sum, log) => sum + log.weight * log.reps, 0);
+  return logs
+    .filter((log) => !log.is_warmup)
+    .reduce((sum, log) => sum + log.weight * log.reps, 0);
 }
 
 function getAverageRpe(logs: LocalSetLog[]) {
-  const rpeLogs = logs.filter((log) => log.rpe !== null);
+  const rpeLogs = logs.filter((log) => !log.is_warmup && log.rpe !== null);
   if (rpeLogs.length === 0) return null;
   return rpeLogs.reduce((sum, log) => sum + Number(log.rpe || 0), 0) / rpeLogs.length;
 }
 
 function buildSuggestion(sessionRows: HistorySetRow[]): ExerciseSuggestion | null {
-  if (sessionRows.length === 0) return null;
+  const workingRows = sessionRows.filter((row) => !row.is_warmup);
+  if (workingRows.length === 0) return null;
 
-  const lastSet = sessionRows[0];
-  const maxWeight = sessionRows.reduce((max, row) => Math.max(max, row.weight), 0);
-  const rpeValues = sessionRows.filter((row) => row.rpe !== null).map((row) => row.rpe as number);
+  const lastSet = workingRows[0];
+  const maxWeight = workingRows.reduce((max, row) => Math.max(max, row.weight), 0);
+  const rpeValues = workingRows.filter((row) => row.rpe !== null).map((row) => row.rpe as number);
   const averageRpe = rpeValues.length > 0 ? rpeValues.reduce((sum, rpe) => sum + rpe, 0) / rpeValues.length : null;
 
   let suggestedWeight = maxWeight;
@@ -210,7 +219,7 @@ export default function EntrenarPage() {
     async function cargarSugerencias(userId: string, exerciseIds: string[]) {
       const { data: historyRows, error: historyError } = await supabase
         .from("set_logs")
-        .select("exercise_id, workout_log_id, weight, reps, rpe, created_at, workout_logs!inner(user_id)")
+        .select("exercise_id, workout_log_id, weight, reps, rpe, is_warmup, created_at, workout_logs!inner(user_id)")
         .in("exercise_id", exerciseIds)
         .eq("workout_logs.user_id", userId)
         .order("created_at", { ascending: false });
@@ -323,6 +332,7 @@ export default function EntrenarPage() {
       const weight = Number(currentInput.weight);
       const reps = Number.parseInt(currentInput.reps, 10);
       const rpe = currentInput.rpe ? Number.parseInt(currentInput.rpe, 10) : null;
+      const isWarmup = currentInput.isWarmup;
 
       if (!Number.isFinite(weight) || weight < 0) {
         throw new Error("Ingresa un peso válido.");
@@ -339,7 +349,7 @@ export default function EntrenarPage() {
       const logId = await ensureWorkoutLog();
       const setNumber = (setLogs[exercise.id]?.length || 0) + 1;
 
-      const data = await authFetch<{ id: string; set_number: number; weight: number; reps: number; rpe: number | null }>(
+      const data = await authFetch<{ id: string; set_number: number; weight: number; reps: number; rpe: number | null; is_warmup: boolean }>(
         "/api/workouts/log-set",
         {
           workoutLogId: logId,
@@ -348,6 +358,7 @@ export default function EntrenarPage() {
           weight,
           reps,
           rpe,
+          isWarmup,
         }
       );
 
@@ -357,6 +368,7 @@ export default function EntrenarPage() {
         weight: Number(data.weight),
         reps: Number(data.reps),
         rpe: data.rpe === null ? null : Number(data.rpe),
+        is_warmup: Boolean(data.is_warmup),
       };
 
       setSetLogs((current) => ({
@@ -389,7 +401,7 @@ export default function EntrenarPage() {
     const exerciseSummaries = routineExercises
       .map((item) => {
         const exercise = one(item.exercises);
-        const logs = exercise?.id ? setLogs[exercise.id] || [] : [];
+        const logs = (exercise?.id ? setLogs[exercise.id] || [] : []).filter((log) => !log.is_warmup);
 
         return {
           exerciseName: exercise?.name || "Ejercicio",
@@ -454,10 +466,11 @@ export default function EntrenarPage() {
 
     setIsFinishing(true);
 
-    const totalSets = Object.values(setLogs).reduce((sum, logs) => sum + logs.length, 0);
+    const allLoggedSets = Object.values(setLogs).flat();
+    const totalSets = allLoggedSets.filter((log) => !log.is_warmup).length;
     const totalVolume = Object.values(setLogs).reduce((sum, logs) => sum + getVolume(logs), 0);
 
-    if (totalSets === 0) {
+    if (allLoggedSets.length === 0) {
       setIsFinishing(false);
       setError("Registra al menos una serie antes de finalizar.");
       return;
@@ -665,6 +678,16 @@ export default function EntrenarPage() {
                 </label>
               </div>
 
+              <label className="mt-3 flex items-center gap-2 text-xs text-zinc-400">
+                <input
+                  type="checkbox"
+                  checked={currentInput.isWarmup}
+                  onChange={(event) => updateInput(item.id, { isWarmup: event.target.checked })}
+                  className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-[#CCFF00]"
+                />
+                Serie de calentamiento (no cuenta en volumen/1RM/RPE)
+              </label>
+
               <button
                 onClick={() => registrarSerie(item)}
                 disabled={isSavingSet}
@@ -678,7 +701,9 @@ export default function EntrenarPage() {
                 <div className="mt-4 grid gap-2">
                   {localLogs.map((log) => (
                     <div key={log.id} className="flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2 text-xs">
-                      <span className="text-zinc-400">Serie {log.set_number}</span>
+                      <span className="text-zinc-400">
+                        Serie {log.set_number} {log.is_warmup && <span className="text-[#CCFF00]">· Calentamiento</span>}
+                      </span>
                       <span className="font-bold text-white">{log.weight} kg × {log.reps} reps {log.rpe ? `• RPE ${log.rpe}` : ""}</span>
                     </div>
                   ))}

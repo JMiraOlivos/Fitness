@@ -16,6 +16,7 @@ type RoutineRef = {
 type SetLogRef = {
   weight: number;
   reps: number;
+  is_warmup: boolean;
 };
 
 type WorkoutLog = {
@@ -27,8 +28,12 @@ type WorkoutLog = {
   set_logs?: SetLogRef[];
 };
 
+function getWorkingSets(workout: WorkoutLog) {
+  return (workout.set_logs || []).filter((setLog) => !setLog.is_warmup);
+}
+
 function getWorkoutVolume(workout: WorkoutLog) {
-  return (workout.set_logs || []).reduce((sum, setLog) => {
+  return getWorkingSets(workout).reduce((sum, setLog) => {
     return sum + Number(setLog.weight || 0) * Number(setLog.reps || 0);
   }, 0);
 }
@@ -64,7 +69,7 @@ export default function HistorialPage() {
   }, [workouts]);
 
   const totalSets = useMemo(() => {
-    return workouts.reduce((sum, workout) => sum + (workout.set_logs?.length || 0), 0);
+    return workouts.reduce((sum, workout) => sum + getWorkingSets(workout).length, 0);
   }, [workouts]);
 
   async function loadPage(from: number) {
@@ -76,7 +81,7 @@ export default function HistorialPage() {
         end_time,
         ai_insight,
         routines ( title ),
-        set_logs ( weight, reps )
+        set_logs ( weight, reps, is_warmup )
       `)
       .order("start_time", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
@@ -184,7 +189,7 @@ export default function HistorialPage() {
         {workouts.map((workout) => {
           const routine = one(workout.routines);
           const volume = getWorkoutVolume(workout);
-          const setCount = workout.set_logs?.length || 0;
+          const setCount = getWorkingSets(workout).length;
           const startDate = new Date(workout.start_time);
 
           return (

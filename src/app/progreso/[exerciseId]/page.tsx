@@ -19,6 +19,7 @@ type SetLog = {
   weight: number;
   reps: number;
   rpe: number | null;
+  is_warmup: boolean;
   exercises?: ExerciseRef | ExerciseRef[] | null;
   workout_logs?: WorkoutRef | WorkoutRef[] | null;
 };
@@ -92,16 +93,17 @@ export default function ExerciseProgressDetailPage() {
     });
   }, [logs]);
 
-  const totalVolume = useMemo(() => volume(logs), [logs]);
-  const maxWeight = useMemo(() => logs.reduce((max, log) => Math.max(max, Number(log.weight || 0)), 0), [logs]);
+  const workingLogs = useMemo(() => logs.filter((log) => !log.is_warmup), [logs]);
+  const totalVolume = useMemo(() => volume(workingLogs), [workingLogs]);
+  const maxWeight = useMemo(() => workingLogs.reduce((max, log) => Math.max(max, Number(log.weight || 0)), 0), [workingLogs]);
   const bestOneRepMax = useMemo(() => {
-    return logs.reduce((max: number | null, log) => {
+    return workingLogs.reduce((max: number | null, log) => {
       const oneRepMax = estimateOneRepMax(Number(log.weight || 0), Number(log.reps || 0));
       if (oneRepMax === null) return max;
       return max === null ? oneRepMax : Math.max(max, oneRepMax);
     }, null);
-  }, [logs]);
-  const trend = useMemo(() => buildTrend(logs), [logs]);
+  }, [workingLogs]);
+  const trend = useMemo(() => buildTrend(workingLogs), [workingLogs]);
   const maxTrendVolume = useMemo(() => Math.max(...trend.map((point) => point.volume), 1), [trend]);
 
   const loadPage = useCallback(
@@ -114,6 +116,7 @@ export default function ExerciseProgressDetailPage() {
           weight,
           reps,
           rpe,
+          is_warmup,
           exercises ( id, name, target_muscle, equipment ),
           workout_logs ( start_time )
         `)
@@ -202,7 +205,7 @@ export default function ExerciseProgressDetailPage() {
           <section className="grid grid-cols-3 gap-3 mb-8">
             <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
               <p className="text-[10px] text-zinc-500 uppercase font-bold">Series</p>
-              <p className="text-xl font-black mt-1">{logs.length}</p>
+              <p className="text-xl font-black mt-1">{workingLogs.length}</p>
             </div>
             <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
               <p className="text-[10px] text-zinc-500 uppercase font-bold">Máx.</p>
@@ -249,7 +252,10 @@ export default function ExerciseProgressDetailPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-black">{log.weight} kg x {log.reps} reps</p>
-                      <p className="text-xs text-zinc-500 mt-1">{dateLabel(workout?.start_time)} · Serie {log.set_number}</p>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        {dateLabel(workout?.start_time)} · Serie {log.set_number}
+                        {log.is_warmup && <span className="text-[#CCFF00]"> · Calentamiento</span>}
+                      </p>
                     </div>
                     {log.rpe && <p className="text-sm font-bold text-[#CCFF00]">RPE {log.rpe}</p>}
                   </div>
