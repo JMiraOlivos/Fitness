@@ -7,6 +7,19 @@ export const metadata: Metadata = {
   title: "NextGen Fitness App",
   description: "Monitoreo inteligente de entrenamientos con IA",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/icons/icon-180.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Fitness",
+  },
 };
 
 export const viewport: Viewport = {
