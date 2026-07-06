@@ -66,6 +66,15 @@ type DashboardMetrics = {
   lastWorkoutLabel: string;
 };
 
+type ExerciseLookupRow = {
+  id: string;
+};
+
+type RoutineSaveError = {
+  code?: string;
+  message?: string;
+};
+
 const initialMetrics: DashboardMetrics = {
   weeklyVolume: 0,
   weeklySets: 0,
@@ -76,6 +85,21 @@ const initialMetrics: DashboardMetrics = {
 
 function getJoinedExercise(exercises: RutinaExerciseGuardada["exercises"]) {
   return Array.isArray(exercises) ? exercises[0] ?? null : exercises ?? null;
+}
+
+function normalizeExerciseText(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function shouldFallbackToLegacySave(error: RoutineSaveError | null) {
+  const message = error?.message || "";
+
+  return (
+    error?.code === "PGRST202" ||
+    message.includes("Could not find the function") ||
+    message.includes("save_ai_routine") ||
+    message.includes("schema cache")
+  );
 }
 
 function getWorkoutVolume(setLogs?: MetricSetLog[]) {
@@ -253,6 +277,72 @@ export default function Dashboard() {
     }
   }
 
+  async function getOrCreateExercise(ejercicio: EjercicioIA) {
+    const name = normalizeExerciseText(ejercicio.nombre);
+    const targetMuscle = normalizeExerciseText(ejercicio.musculoObjetivo);
+    const equipment = normalizeExerciseText(ejercicio.equipamiento);
+
+    const { data: existingExercise, error: lookupError } = await supabase
+      .from("exercises")
+      .select("id")
+      .ilike("name", name)
+      .ilike("target_muscle", targetMuscle)
+      .ilike("equipment", equipment)
+      .maybeSingle();
+
+    if (lookupError) throw lookupError;
+    if ((existingExercise as ExerciseLookupRow | null)?.id) return (existingExercise as ExerciseLookupRow).id;
+
+    const { data: exerciseRow, error: exerciseError } = await supabase
+      .from("exercises")
+      .insert({ name, target_muscle: targetMuscle, equipment })
+      .select("id")
+      .single();
+
+    if (exerciseError) {
+      const { data: existingAfterConflict } = await supabase
+        .from("exercises")
+        .select("id")
+        .ilike("name", name)
+        .ilike("target_muscle", targetMuscle)
+        .ilike("equipment", equipment)
+        .maybeSingle();
+
+      if ((existingAfterConflict as ExerciseLookupRow | null)?.id) return (existingAfterConflict as ExerciseLookupRow).id;
+      throw exerciseError;
+    }
+
+    if (!exerciseRow?.id) throw new Error(`No se pudo crear el ejercicio ${name}.`);
+    return exerciseRow.id as string;
+  }
+
+  async function guardarRutinaLegacy(rutina: RutinaIA) {
+    const { data: routineRow, error: routineError } = await supabase
+      .from("routines")
+      .insert({ user_id: user?.id, title: rutina.titulo, description: rutina.descripcion })
+      .select("id")
+      .single();
+
+    if (routineError) throw routineError;
+    if (!routineRow?.id) throw new Error("No se pudo crear la rutina.");
+
+    for (let index = 0; index < rutina.ejercicios.length; index += 1) {
+      const ejercicio = rutina.ejercicios[index];
+      const exerciseId = await getOrCreateExercise(ejercicio);
+
+      const { error: relationError } = await supabase.from("routine_exercises").insert({
+        routine_id: routineRow.id,
+        exercise_id: exerciseId,
+        order_index: index + 1,
+        target_sets: ejercicio.seriesObjetivo,
+        target_reps: ejercicio.repeticionesObjetivo,
+        notes: ejercicio.notas,
+      });
+
+      if (relationError) throw relationError;
+    }
+  }
+
   async function guardarRutina(rutina: RutinaIA) {
     setError(null);
     setSuccessMessage(null);
@@ -266,7 +356,11 @@ export default function Dashboard() {
 
     try {
       const { error: rpcError } = await supabase.rpc("save_ai_routine", { p_routine: rutina });
-      if (rpcError) throw rpcError;
+
+      if (rpcError) {
+        if (shouldFallbackToLegacySave(rpcError)) await guardarRutinaLegacy(rutina);
+        else throw rpcError;
+      }
 
       setSuccessMessage(`Rutina "${rutina.titulo}" guardada.`);
       await cargarRutinasGuardadas();
