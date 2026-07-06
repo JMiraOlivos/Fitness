@@ -41,6 +41,7 @@ export type Database = {
           name: string;
           target_muscle: string;
           equipment: string;
+          owner_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -48,6 +49,7 @@ export type Database = {
           name: string;
           target_muscle: string;
           equipment: string;
+          owner_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -55,6 +57,7 @@ export type Database = {
           name?: string;
           target_muscle?: string;
           equipment?: string;
+          owner_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
