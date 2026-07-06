@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { ArrowLeft, CheckCircle2, Dumbbell, Loader2, Play, Plus, Square } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Dumbbell, Loader2, Play, Plus, Sparkles, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 
@@ -53,6 +53,24 @@ type WorkoutInsightResponse = {
   error?: string;
 };
 
+type HistorySetRow = {
+  exercise_id: string;
+  workout_log_id: string;
+  weight: number;
+  reps: number;
+  rpe: number | null;
+  created_at: string;
+};
+
+type ExerciseSuggestion = {
+  lastWeight: number;
+  lastReps: number;
+  lastRpe: number | null;
+  lastDate: string;
+  suggestedWeight: number;
+  suggestionLabel: string;
+};
+
 function defaultInput(): SetInput {
   return {
     weight: "",
@@ -69,6 +87,43 @@ function getAverageRpe(logs: LocalSetLog[]) {
   const rpeLogs = logs.filter((log) => log.rpe !== null);
   if (rpeLogs.length === 0) return null;
   return rpeLogs.reduce((sum, log) => sum + Number(log.rpe || 0), 0) / rpeLogs.length;
+}
+
+function buildSuggestion(sessionRows: HistorySetRow[]): ExerciseSuggestion | null {
+  if (sessionRows.length === 0) return null;
+
+  const lastSet = sessionRows[0];
+  const maxWeight = sessionRows.reduce((max, row) => Math.max(max, row.weight), 0);
+  const rpeValues = sessionRows.filter((row) => row.rpe !== null).map((row) => row.rpe as number);
+  const averageRpe = rpeValues.length > 0 ? rpeValues.reduce((sum, rpe) => sum + rpe, 0) / rpeValues.length : null;
+
+  let suggestedWeight = maxWeight;
+  let suggestionLabel = "Repite el peso, ajusta reps si puedes.";
+
+  if (averageRpe !== null) {
+    if (averageRpe <= 7) {
+      suggestedWeight = maxWeight + 2.5;
+      suggestionLabel = `RPE ${averageRpe.toFixed(1)} bajo. Sube +2.5 kg.`;
+    } else if (averageRpe >= 9) {
+      suggestedWeight = maxWeight;
+      suggestionLabel = `RPE ${averageRpe.toFixed(1)} alto. Mantén el peso.`;
+    } else {
+      suggestionLabel = `RPE ${averageRpe.toFixed(1)}. Mantén el peso, busca más reps.`;
+    }
+  }
+
+  return {
+    lastWeight: lastSet.weight,
+    lastReps: lastSet.reps,
+    lastRpe: lastSet.rpe,
+    lastDate: lastSet.created_at,
+    suggestedWeight,
+    suggestionLabel,
+  };
+}
+
+function formatRelativeDate(value: string) {
+  return new Date(value).toLocaleDateString("es-CL", { day: "2-digit", month: "short" });
 }
 
 export default function EntrenarPage() {
@@ -88,6 +143,7 @@ export default function EntrenarPage() {
   const [isFinishing, setIsFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Record<string, ExerciseSuggestion>>({});
 
   const routineExercises = useMemo(() => {
     return [...(routine?.routine_exercises || [])].sort((a, b) => a.order_index - b.order_index);
@@ -131,11 +187,60 @@ export default function EntrenarPage() {
 
       if (routineError) {
         setError(routineError.message);
-      } else {
-        setRoutine(data as unknown as RoutineRow);
+        setIsLoading(false);
+        return;
+      }
+
+      const loadedRoutine = data as unknown as RoutineRow;
+      setRoutine(loadedRoutine);
+
+      const exerciseIds = (loadedRoutine.routine_exercises || [])
+        .map((item) => one(item.exercises)?.id)
+        .filter((id): id is string => Boolean(id));
+
+      if (exerciseIds.length > 0) {
+        await cargarSugerencias(authData.user.id, exerciseIds);
       }
 
       setIsLoading(false);
+    }
+
+    async function cargarSugerencias(userId: string, exerciseIds: string[]) {
+      const { data: historyRows, error: historyError } = await supabase
+        .from("set_logs")
+        .select("exercise_id, workout_log_id, weight, reps, rpe, created_at, workout_logs!inner(user_id)")
+        .in("exercise_id", exerciseIds)
+        .eq("workout_logs.user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (historyError || !historyRows) {
+        return;
+      }
+
+      const lastWorkoutByExercise: Record<string, string> = {};
+      const sessionsByExercise: Record<string, HistorySetRow[]> = {};
+
+      for (const row of historyRows as unknown as HistorySetRow[]) {
+        const currentWorkoutLogId = lastWorkoutByExercise[row.exercise_id];
+
+        if (!currentWorkoutLogId) {
+          lastWorkoutByExercise[row.exercise_id] = row.workout_log_id;
+          sessionsByExercise[row.exercise_id] = [row];
+        } else if (currentWorkoutLogId === row.workout_log_id) {
+          sessionsByExercise[row.exercise_id].push(row);
+        }
+      }
+
+      const nextSuggestions: Record<string, ExerciseSuggestion> = {};
+
+      for (const exerciseId of Object.keys(sessionsByExercise)) {
+        const suggestion = buildSuggestion(sessionsByExercise[exerciseId]);
+        if (suggestion) {
+          nextSuggestions[exerciseId] = suggestion;
+        }
+      }
+
+      setSuggestions(nextSuggestions);
     }
 
     void bootstrap();
@@ -150,6 +255,13 @@ export default function EntrenarPage() {
         ...patch,
       },
     }));
+  }
+
+  function aplicarSugerencia(routineExerciseId: string, suggestion: ExerciseSuggestion) {
+    updateInput(routineExerciseId, {
+      weight: String(suggestion.suggestedWeight),
+      reps: String(suggestion.lastReps),
+    });
   }
 
   async function ensureWorkoutLog() {
@@ -486,6 +598,7 @@ export default function EntrenarPage() {
           const exercise = one(item.exercises);
           const currentInput = inputs[item.id] || defaultInput();
           const localLogs = exercise?.id ? setLogs[exercise.id] || [] : [];
+          const suggestion = exercise?.id ? suggestions[exercise.id] : undefined;
 
           return (
             <article key={item.id} className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
@@ -514,6 +627,30 @@ export default function EntrenarPage() {
               </div>
 
               {item.notes && <p className="mb-4 text-xs text-zinc-400">{item.notes}</p>}
+
+              {suggestion && (
+                <div className="mb-4 rounded-2xl border border-[#CCFF00]/30 bg-[#CCFF00]/5 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-[#CCFF00] inline-flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" /> Última vez ({formatRelativeDate(suggestion.lastDate)})
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-white">
+                        {suggestion.lastWeight} kg × {suggestion.lastReps} reps
+                        {suggestion.lastRpe ? ` · RPE ${suggestion.lastRpe}` : ""}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-400">{suggestion.suggestionLabel}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => aplicarSugerencia(item.id, suggestion)}
+                      className="shrink-0 rounded-xl bg-[#CCFF00] px-3 py-2 text-xs font-black text-black"
+                    >
+                      Usar {suggestion.suggestedWeight} kg
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-2">
                 <label className="grid gap-1 text-xs text-zinc-400">
