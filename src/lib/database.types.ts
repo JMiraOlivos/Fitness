@@ -1,0 +1,252 @@
+// Hand-authored from supabase/schema.sql and supabase/migrations/*.sql, in the
+// shape produced by `supabase gen types typescript`. This environment's network
+// policy blocks the Supabase Management API and raw Postgres connections, so this
+// could not be generated directly against the live project. Regenerate for real
+// with:
+//   npx supabase gen types typescript --project-id joyvxekdpekoenkfifqr --schema public > src/lib/database.types.ts
+// and diff against this file if the live schema has drifted.
+
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+export type Database = {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          updated_at: string | null;
+          full_name: string | null;
+          preferred_unit: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          updated_at?: string | null;
+          full_name?: string | null;
+          preferred_unit?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          updated_at?: string | null;
+          full_name?: string | null;
+          preferred_unit?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      exercises: {
+        Row: {
+          id: string;
+          name: string;
+          target_muscle: string;
+          equipment: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          target_muscle: string;
+          equipment: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          target_muscle?: string;
+          equipment?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      routines: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          description: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          description?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "routines_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      routine_exercises: {
+        Row: {
+          id: string;
+          routine_id: string;
+          exercise_id: string;
+          order_index: number;
+          target_sets: number | null;
+          target_reps: string | null;
+          notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          routine_id: string;
+          exercise_id: string;
+          order_index: number;
+          target_sets?: number | null;
+          target_reps?: string | null;
+          notes?: string | null;
+        };
+        Update: {
+          id?: string;
+          routine_id?: string;
+          exercise_id?: string;
+          order_index?: number;
+          target_sets?: number | null;
+          target_reps?: string | null;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "routine_exercises_routine_id_fkey";
+            columns: ["routine_id"];
+            isOneToOne: false;
+            referencedRelation: "routines";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "routine_exercises_exercise_id_fkey";
+            columns: ["exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercises";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workout_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          routine_id: string | null;
+          start_time: string;
+          end_time: string | null;
+          ai_insight: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          routine_id?: string | null;
+          start_time?: string;
+          end_time?: string | null;
+          ai_insight?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          routine_id?: string | null;
+          start_time?: string;
+          end_time?: string | null;
+          ai_insight?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workout_logs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workout_logs_routine_id_fkey";
+            columns: ["routine_id"];
+            isOneToOne: false;
+            referencedRelation: "routines";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      set_logs: {
+        Row: {
+          id: string;
+          workout_log_id: string;
+          exercise_id: string;
+          set_number: number;
+          weight: number;
+          reps: number;
+          rpe: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workout_log_id: string;
+          exercise_id: string;
+          set_number: number;
+          weight: number;
+          reps: number;
+          rpe?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workout_log_id?: string;
+          exercise_id?: string;
+          set_number?: number;
+          weight?: number;
+          reps?: number;
+          rpe?: number | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "set_logs_workout_log_id_fkey";
+            columns: ["workout_log_id"];
+            isOneToOne: false;
+            referencedRelation: "workout_logs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "set_logs_exercise_id_fkey";
+            columns: ["exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercises";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+    };
+    Views: Record<never, never>;
+    Functions: {
+      save_ai_routine: {
+        Args: { p_routine: Json };
+        Returns: string;
+      };
+      save_routine_with_exercises: {
+        Args: {
+          routine_title: string;
+          routine_description: string | null;
+          exercises_payload: Json;
+        };
+        Returns: string;
+      };
+    };
+    Enums: Record<never, never>;
+    CompositeTypes: Record<never, never>;
+  };
+};
+
+export type Tables<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
+export type TablesInsert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"];
+export type TablesUpdate<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Update"];

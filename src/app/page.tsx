@@ -313,10 +313,10 @@ export default function Dashboard() {
     return exerciseRow.id as string;
   }
 
-  async function guardarRutinaLegacy(rutina: RutinaIA) {
+  async function guardarRutinaLegacy(rutina: RutinaIA, userId: string) {
     const { data: routineRow, error: routineError } = await supabase
       .from("routines")
-      .insert({ user_id: user?.id, title: rutina.titulo, description: rutina.descripcion })
+      .insert({ user_id: userId, title: rutina.titulo, description: rutina.descripcion })
       .select("id")
       .single();
 
@@ -355,7 +355,7 @@ export default function Dashboard() {
       const { error: rpcError } = await supabase.rpc("save_ai_routine", { p_routine: rutina });
 
       if (rpcError) {
-        if (shouldFallbackToLegacySave(rpcError)) await guardarRutinaLegacy(rutina);
+        if (shouldFallbackToLegacySave(rpcError)) await guardarRutinaLegacy(rutina, user.id);
         else throw rpcError;
       }
 
