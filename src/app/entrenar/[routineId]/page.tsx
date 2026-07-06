@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Dumbbell, Loader2, Play, Plus, Repeat, Sparkles, Square } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, CheckCircle2, CheckCircle, Dumbbell, Loader2, Play, Plus, Repeat, Sparkles, Square, Timer, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
@@ -74,6 +74,14 @@ type ExerciseSuggestion = {
   suggestedWeight: number;
   suggestionLabel: string;
 };
+
+const REST_DURATION_SECONDS = 90;
+
+function formatRestTime(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${minutes}:${String(remaining).padStart(2, "0")}`;
+}
 
 function defaultInput(): SetInput {
   return {
@@ -158,6 +166,19 @@ export default function EntrenarPage() {
   const [substituteOptions, setSubstituteOptions] = useState<ExerciseRow[]>([]);
   const [isLoadingSubstitutes, setIsLoadingSubstitutes] = useState(false);
   const [isSubstituting, setIsSubstituting] = useState(false);
+  const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
+  const [completedExerciseIds, setCompletedExerciseIds] = useState<Set<string>>(new Set());
+  const exerciseRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  useEffect(() => {
+    if (restSecondsLeft === null || restSecondsLeft <= 0) return;
+
+    const timeout = setTimeout(() => {
+      setRestSecondsLeft((current) => (current !== null ? current - 1 : null));
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [restSecondsLeft]);
 
   const routineExercises = useMemo(() => {
     return [...(routine?.routine_exercises || [])].sort((a, b) => a.order_index - b.order_index);
@@ -484,6 +505,7 @@ export default function EntrenarPage() {
       }));
 
       setSuccessMessage(`Serie ${setNumber} registrada para ${exercise.name}.`);
+      setRestSecondsLeft(REST_DURATION_SECONDS);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo registrar la serie.");
     } finally {
@@ -649,6 +671,23 @@ export default function EntrenarPage() {
         <h1 className="text-3xl font-black tracking-tight mt-1">{routine.title}</h1>
         <p className="text-sm text-zinc-400 mt-2">{routine.description || "Registra peso, repeticiones y RPE por serie."}</p>
       </header>
+
+      {restSecondsLeft !== null && (
+        <div className="fixed bottom-20 left-0 right-0 z-40 mx-auto max-w-md px-6">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#CCFF00]/40 bg-black/95 p-4 shadow-lg shadow-black/50 backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <Timer className="h-5 w-5 text-[#CCFF00]" />
+              <div>
+                <p className="text-[10px] uppercase font-bold text-zinc-400">Descanso</p>
+                <p className="text-xl font-black">{restSecondsLeft > 0 ? formatRestTime(restSecondsLeft) : "¡Listo!"}</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => setRestSecondsLeft(null)} className="rounded-full bg-zinc-900 p-2 text-zinc-400">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="grid grid-cols-2 gap-4 mb-6">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
