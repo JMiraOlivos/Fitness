@@ -1,10 +1,23 @@
--- Save a complete routine atomically from the client using Supabase RPC.
--- This avoids partially saved routines when an exercise or relation insert fails.
--- Requires 20260705_harden_exercise_deduplication.sql first.
+-- Consolidates the same-day rewrites of the routine-saving RPC into one canonical,
+-- idempotent migration. Replaces (and supersedes):
+--   - 20260705_save_ai_routine_rpc.sql
+--   - 20260705_atomic_routine_save.sql
+--   - 20260705_save_routine_transaction.sql
+-- Those three files rewrote public.save_routine_with_exercises / public.save_ai_routine
+-- three times on the same day with drifting signatures. This migration reflects the
+-- final, correct state (equivalent to 20260705_save_routine_transaction.sql) and is
+-- safe to run regardless of which of the three prior migrations already ran in a given
+-- environment: it drops any known prior signature before recreating the functions, since
+-- PostgreSQL does not allow CREATE OR REPLACE FUNCTION to rename input parameters.
+-- Requires the exercises_normalized_identity_idx unique index from
+-- 20260705_harden_exercise_deduplication.sql.
 
 begin;
 
-create or replace function public.save_routine_with_exercises(
+drop function if exists public.save_routine_with_exercises(text, text, jsonb);
+drop function if exists public.save_ai_routine(jsonb);
+
+create function public.save_routine_with_exercises(
   routine_title text,
   routine_description text,
   exercises_payload jsonb
@@ -99,8 +112,8 @@ begin
 end;
 $$;
 
--- Compatibility wrapper for the current dashboard payload shape.
-create or replace function public.save_ai_routine(p_routine jsonb)
+-- Compatibility wrapper for the current dashboard payload shape (Spanish keys from Gemini).
+create function public.save_ai_routine(p_routine jsonb)
 returns uuid
 language plpgsql
 security definer
