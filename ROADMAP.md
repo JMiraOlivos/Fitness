@@ -155,7 +155,7 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 
 ### Alcance funcional
 
-- Prellenado "igual que la vez pasada" (pesos/reps de la última sesión de la misma rutina) — sin dependencias de schema, se puede adelantar en paralelo a la Fase 6 si se busca una victoria visible rápida.
+- ✅ Prellenado "igual que la vez pasada" — `/entrenar/[routineId]` muestra por ejercicio la última sesión registrada (peso/reps/RPE, en cualquier rutina) junto con una sugerencia de progresión (subir, mantener o bajar carga según el RPE promedio) y un botón para aplicarla a los inputs de la serie actual.
 - Botón para copiar serie anterior.
 - Botones rápidos `+2.5 kg`, `-2.5 kg`, `+1 rep`.
 - Timer de descanso — sin dependencias, también adelantable.
@@ -219,5 +219,5 @@ Ampliar más allá del esqueleto de CI de la Fase 6: tests unitarios para volume
 1. ~~**Fase 0**~~ — ✅ completa: prompt hardcodeado quitado, docs de auth alineadas, código muerto borrado, migraciones RPC consolidadas, guard de 1RM agregado.
 2. **Fase 6** — `database.types.ts` (pendiente), proveedor de sesión, server actions, paginación, CI. (Helpers compartidos y fórmula de 1RM ya se adelantaron en Fase 0.)
 3. **Fase 8 (fundamentos de datos)** — taxonomía de grupos musculares, flag de calentamiento, perfil persistente, granularidad de RPE.
-4. **Fase 5 + Fase 8 (features visibles)** — timer de descanso y "igual que la vez pasada" se pueden adelantar en paralelo; el resto de Fase 8 sigue a sus fundamentos de datos.
+4. **Fase 5 + Fase 8 (features visibles)** — ~~timer de descanso~~ y ~~"igual que la vez pasada"~~ se pueden adelantar en paralelo; "igual que la vez pasada" ya está ✅ hecho. El resto de Fase 8 sigue a sus fundamentos de datos.
 5. **Fase 7** — PWA, al final.
