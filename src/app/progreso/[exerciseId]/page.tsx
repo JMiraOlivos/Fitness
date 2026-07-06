@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, Loader2, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { estimateOneRepMax } from "@/lib/oneRepMax";
+
+const PAGE_SIZE = 50;
 
 type ExerciseRef = { id: string; name: string; target_muscle: string; equipment: string };
 type WorkoutRef = { start_time: string };
@@ -77,6 +79,8 @@ export default function ExerciseProgressDetailPage() {
   const [user, setUser] = useState<User | null>(null);
   const [logs, setLogs] = useState<SetLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const exercise = one(logs[0]?.exercises);
@@ -100,6 +104,35 @@ export default function ExerciseProgressDetailPage() {
   const trend = useMemo(() => buildTrend(logs), [logs]);
   const maxTrendVolume = useMemo(() => Math.max(...trend.map((point) => point.volume), 1), [trend]);
 
+  const loadPage = useCallback(
+    async (from: number) => {
+      const { data, error: loadError } = await supabase
+        .from("set_logs")
+        .select(`
+          id,
+          set_number,
+          weight,
+          reps,
+          rpe,
+          exercises ( id, name, target_muscle, equipment ),
+          workout_logs ( start_time )
+        `)
+        .eq("exercise_id", params.exerciseId)
+        .order("created_at", { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (loadError) {
+        setError(loadError.message);
+        return [];
+      }
+
+      const page = (data || []) as unknown as SetLog[];
+      setHasMore(page.length === PAGE_SIZE);
+      return page;
+    },
+    [params.exerciseId]
+  );
+
   useEffect(() => {
     async function loadExercise() {
       setIsLoading(true);
@@ -113,28 +146,20 @@ export default function ExerciseProgressDetailPage() {
         return;
       }
 
-      const { data, error: loadError } = await supabase
-        .from("set_logs")
-        .select(`
-          id,
-          set_number,
-          weight,
-          reps,
-          rpe,
-          exercises ( id, name, target_muscle, equipment ),
-          workout_logs ( start_time )
-        `)
-        .eq("exercise_id", params.exerciseId)
-        .limit(100);
-
-      if (loadError) setError(loadError.message);
-      else setLogs((data || []) as unknown as SetLog[]);
-
+      const page = await loadPage(0);
+      setLogs(page);
       setIsLoading(false);
     }
 
     void loadExercise();
-  }, [params.exerciseId]);
+  }, [params.exerciseId, loadPage]);
+
+  async function cargarMas() {
+    setIsLoadingMore(true);
+    const nextPage = await loadPage(logs.length);
+    setLogs((current) => [...current, ...nextPage]);
+    setIsLoadingMore(false);
+  }
 
   if (isLoading) {
     return (
@@ -233,6 +258,17 @@ export default function ExerciseProgressDetailPage() {
               );
             })}
           </section>
+
+          {hasMore && (
+            <button
+              onClick={cargarMas}
+              disabled={isLoadingMore}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 font-black text-zinc-300 disabled:opacity-50"
+            >
+              {isLoadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isLoadingMore ? "Cargando..." : "Cargar más"}
+            </button>
+          )}
         </>
       )}
     </main>

@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, CalendarDays, Dumbbell, Loader2, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { one } from "@/lib/supabaseJoins";
+
+const PAGE_SIZE = 20;
 
 type RoutineRef = {
   title: string;
@@ -23,14 +26,6 @@ type WorkoutLog = {
   routines?: RoutineRef | RoutineRef[] | null;
   set_logs?: SetLogRef[];
 };
-
-function getJoinedRoutine(routines: WorkoutLog["routines"]) {
-  if (Array.isArray(routines)) {
-    return routines[0] ?? null;
-  }
-
-  return routines ?? null;
-}
 
 function getWorkoutVolume(workout: WorkoutLog) {
   return (workout.set_logs || []).reduce((sum, setLog) => {
@@ -60,6 +55,8 @@ export default function HistorialPage() {
   const [user, setUser] = useState<User | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const totalVolume = useMemo(() => {
@@ -69,6 +66,30 @@ export default function HistorialPage() {
   const totalSets = useMemo(() => {
     return workouts.reduce((sum, workout) => sum + (workout.set_logs?.length || 0), 0);
   }, [workouts]);
+
+  async function loadPage(from: number) {
+    const { data, error: loadError } = await supabase
+      .from("workout_logs")
+      .select(`
+        id,
+        start_time,
+        end_time,
+        ai_insight,
+        routines ( title ),
+        set_logs ( weight, reps )
+      `)
+      .order("start_time", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (loadError) {
+      setError(loadError.message);
+      return [];
+    }
+
+    const page = (data || []) as unknown as WorkoutLog[];
+    setHasMore(page.length === PAGE_SIZE);
+    return page;
+  }
 
   useEffect(() => {
     async function loadHistory() {
@@ -83,30 +104,20 @@ export default function HistorialPage() {
         return;
       }
 
-      const { data, error: loadError } = await supabase
-        .from("workout_logs")
-        .select(`
-          id,
-          start_time,
-          end_time,
-          ai_insight,
-          routines ( title ),
-          set_logs ( weight, reps )
-        `)
-        .order("start_time", { ascending: false })
-        .limit(30);
-
-      if (loadError) {
-        setError(loadError.message);
-      } else {
-        setWorkouts((data || []) as unknown as WorkoutLog[]);
-      }
-
+      const page = await loadPage(0);
+      setWorkouts(page);
       setIsLoading(false);
     }
 
     void loadHistory();
   }, []);
+
+  async function cargarMas() {
+    setIsLoadingMore(true);
+    const nextPage = await loadPage(workouts.length);
+    setWorkouts((current) => [...current, ...nextPage]);
+    setIsLoadingMore(false);
+  }
 
   return (
     <main className="min-h-screen bg-black text-white p-6 pb-16 font-sans max-w-md mx-auto">
@@ -172,7 +183,7 @@ export default function HistorialPage() {
 
       <section className="grid gap-4">
         {workouts.map((workout) => {
-          const routine = getJoinedRoutine(workout.routines);
+          const routine = one(workout.routines);
           const volume = getWorkoutVolume(workout);
           const setCount = workout.set_logs?.length || 0;
           const startDate = new Date(workout.start_time);
@@ -225,6 +236,17 @@ export default function HistorialPage() {
           );
         })}
       </section>
+
+      {user && !isLoading && hasMore && workouts.length > 0 && (
+        <button
+          onClick={cargarMas}
+          disabled={isLoadingMore}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 font-black text-zinc-300 disabled:opacity-50"
+        >
+          {isLoadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {isLoadingMore ? "Cargando..." : "Cargar más"}
+        </button>
+      )}
     </main>
   );
 }
