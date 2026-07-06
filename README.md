@@ -18,7 +18,7 @@ Aplicación móvil adaptativa construida con Next.js App Router, Tailwind CSS, S
 - Dashboard mobile-first tipo PWA.
 - Generación de rutinas con Gemini.
 - Formulario para ajustar días disponibles, enfoque y restricciones.
-- Login con magic link de Supabase Auth.
+- Login con email y contraseña vía Supabase Auth.
 - Guardado de rutinas generadas en Supabase.
 - Lectura de rutinas guardadas por usuario.
 - RLS/policies para proteger datos por usuario.
@@ -65,12 +65,14 @@ La migración agrega:
 
 ## Supabase Auth
 
-Para que el magic link funcione en producción:
+El login (`/auth`) usa `supabase.auth.signUp` y `supabase.auth.signInWithPassword` con email y contraseña — no hay magic link ni OTP en el flujo actual.
+
+Para que funcione en producción:
 
 1. Entra a Supabase.
 2. Ve a `Authentication -> URL Configuration`.
 3. Agrega tu dominio de Vercel en `Site URL`.
-4. Agrega el mismo dominio en `Redirect URLs`.
+4. Si tienes activada la confirmación de email, agrega el mismo dominio en `Redirect URLs` para que el link de confirmación redirija de vuelta a la app.
 
 Ejemplo:
 
