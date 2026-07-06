@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, CheckCircle2, Dumbbell, Loader2, Play, Plus, Square } from "lucide-react";
@@ -80,6 +80,7 @@ function getAverageRpe(logs: LocalSetLog[]) {
 
 export default function EntrenarPage() {
   const params = useParams<{ routineId: string }>();
+  const router = useRouter();
   const routineId = params.routineId;
 
   const [user, setUser] = useState<User | null>(null);
@@ -388,7 +389,7 @@ export default function EntrenarPage() {
       return;
     }
 
-    setSuccessMessage(`Entrenamiento finalizado: ${totalSets} series, ${Math.round(totalVolume)} kg de volumen. Insight IA guardado.`);
+    router.push(`/historial/${workoutLogId}`);
   }
 
   if (isLoading) {
