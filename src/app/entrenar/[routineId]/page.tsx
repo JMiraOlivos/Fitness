@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle2, Dumbbell, Loader2, Play, Plus, Sparkles, Squar
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
+import { authFetch } from "@/lib/authFetch";
 
 type ExerciseRow = {
   id: string;
@@ -280,30 +281,19 @@ export default function EntrenarPage() {
 
     setIsStarting(true);
 
-    const { data, error: insertError } = await supabase
-      .from("workout_logs")
-      .insert({
-        user_id: user.id,
-        routine_id: routine.id,
-      })
-      .select("id, start_time")
-      .single();
+    let data: { id: string; startTime: string | null };
 
-    setIsStarting(false);
-
-    if (insertError) {
-      throw insertError;
-    }
-
-    if (!data?.id) {
-      throw new Error("No se pudo iniciar el entrenamiento.");
+    try {
+      data = await authFetch<{ id: string; startTime: string | null }>("/api/workouts/start", { routineId: routine.id });
+    } finally {
+      setIsStarting(false);
     }
 
     setWorkoutLogId(data.id);
-    setStartTime(data.start_time ? new Date(data.start_time as string) : new Date());
+    setStartTime(data.startTime ? new Date(data.startTime) : new Date());
     setSuccessMessage("Entrenamiento iniciado.");
 
-    return data.id as string;
+    return data.id;
   }
 
   async function iniciarEntrenamiento() {
@@ -349,25 +339,20 @@ export default function EntrenarPage() {
       const logId = await ensureWorkoutLog();
       const setNumber = (setLogs[exercise.id]?.length || 0) + 1;
 
-      const { data, error: insertError } = await supabase
-        .from("set_logs")
-        .insert({
-          workout_log_id: logId,
-          exercise_id: exercise.id,
-          set_number: setNumber,
+      const data = await authFetch<{ id: string; set_number: number; weight: number; reps: number; rpe: number | null }>(
+        "/api/workouts/log-set",
+        {
+          workoutLogId: logId,
+          exerciseId: exercise.id,
+          setNumber,
           weight,
           reps,
           rpe,
-        })
-        .select("id, set_number, weight, reps, rpe")
-        .single();
-
-      if (insertError) {
-        throw insertError;
-      }
+        }
+      );
 
       const savedSet: LocalSetLog = {
-        id: data.id as string,
+        id: data.id,
         set_number: Number(data.set_number),
         weight: Number(data.weight),
         reps: Number(data.reps),
@@ -480,21 +465,15 @@ export default function EntrenarPage() {
 
     const aiInsight = await generarInsightEntrenamiento(totalSets, totalVolume);
 
-    const { error: updateError } = await supabase
-      .from("workout_logs")
-      .update({
-        end_time: new Date().toISOString(),
-        ai_insight: aiInsight,
-      })
-      .eq("id", workoutLogId);
-
-    setIsFinishing(false);
-
-    if (updateError) {
-      setError(updateError.message);
+    try {
+      await authFetch("/api/workouts/finish", { workoutLogId, aiInsight });
+    } catch (err) {
+      setIsFinishing(false);
+      setError(err instanceof Error ? err.message : "No se pudo finalizar el entrenamiento.");
       return;
     }
 
+    setIsFinishing(false);
     router.push(`/historial/${workoutLogId}`);
   }
 
