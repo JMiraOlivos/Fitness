@@ -279,6 +279,36 @@ export default function EntrenarPage() {
     });
   }
 
+  function copiarSerieAnterior(routineExerciseId: string, ultimaSerie: LocalSetLog) {
+    updateInput(routineExerciseId, {
+      weight: String(ultimaSerie.weight),
+      reps: String(ultimaSerie.reps),
+      rpe: ultimaSerie.rpe !== null ? String(ultimaSerie.rpe) : "",
+    });
+  }
+
+  function ajustarPeso(routineExerciseId: string, delta: number) {
+    setInputs((current) => {
+      const existing = current[routineExerciseId] || defaultInput();
+      const nextWeight = Math.max(0, (Number(existing.weight) || 0) + delta);
+      return {
+        ...current,
+        [routineExerciseId]: { ...existing, weight: String(Math.round(nextWeight * 100) / 100) },
+      };
+    });
+  }
+
+  function ajustarReps(routineExerciseId: string, delta: number) {
+    setInputs((current) => {
+      const existing = current[routineExerciseId] || defaultInput();
+      const nextReps = Math.max(0, (Number.parseInt(existing.reps, 10) || 0) + delta);
+      return {
+        ...current,
+        [routineExerciseId]: { ...existing, reps: String(nextReps) },
+      };
+    });
+  }
+
   async function abrirSustitucion(item: RoutineExerciseRow) {
     const exercise = one(item.exercises);
     if (!exercise) return;
@@ -765,6 +795,16 @@ export default function EntrenarPage() {
                 </div>
               )}
 
+              {localLogs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => copiarSerieAnterior(item.id, localLogs[localLogs.length - 1])}
+                  className="mb-3 inline-flex items-center gap-1 text-xs font-bold text-zinc-400"
+                >
+                  <Repeat className="h-3 w-3" /> Copiar serie anterior
+                </button>
+              )}
+
               <div className="grid grid-cols-3 gap-2">
                 <label className="grid gap-1 text-xs text-zinc-400">
                   Peso
@@ -796,6 +836,33 @@ export default function EntrenarPage() {
                     className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-3 text-white outline-none focus:border-[#CCFF00]"
                   />
                 </label>
+              </div>
+
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => ajustarPeso(item.id, -2.5)}
+                    className="flex-1 rounded-xl bg-zinc-900 py-2 text-xs font-bold text-zinc-300"
+                  >
+                    -2.5
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => ajustarPeso(item.id, 2.5)}
+                    className="flex-1 rounded-xl bg-zinc-900 py-2 text-xs font-bold text-zinc-300"
+                  >
+                    +2.5
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => ajustarReps(item.id, 1)}
+                  className="rounded-xl bg-zinc-900 py-2 text-xs font-bold text-zinc-300"
+                >
+                  +1 rep
+                </button>
+                <div />
               </div>
 
               <label className="mt-3 flex items-center gap-2 text-xs text-zinc-400">
