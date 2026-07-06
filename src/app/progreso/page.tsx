@@ -88,6 +88,41 @@ function buildProgress(setLogs: SetLog[]) {
   return Array.from(map.values()).sort((a, b) => b.volume - a.volume);
 }
 
+type MuscleGroupVolume = {
+  muscleGroup: string;
+  volume: number;
+  sets: number;
+};
+
+function buildMuscleGroupWeeklyVolume(setLogs: SetLog[]) {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const map = new Map<string, MuscleGroupVolume>();
+
+  for (const setLog of setLogs) {
+    if (setLog.is_warmup) continue;
+
+    const exercise = one(setLog.exercises);
+    const workout = one(setLog.workout_logs);
+
+    if (!exercise?.target_muscle) continue;
+    if (!workout?.start_time || new Date(workout.start_time) < sevenDaysAgo) continue;
+
+    const current = map.get(exercise.target_muscle) || {
+      muscleGroup: exercise.target_muscle,
+      volume: 0,
+      sets: 0,
+    };
+
+    current.volume += Number(setLog.weight || 0) * Number(setLog.reps || 0);
+    current.sets += 1;
+    map.set(exercise.target_muscle, current);
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.volume - a.volume);
+}
+
 function formatDate(value: string) {
   if (!value) return "Sin fecha";
   return new Date(value).toLocaleDateString("es-CL", { day: "2-digit", month: "short" });
@@ -103,6 +138,11 @@ export default function ProgresoPage() {
   const totalVolume = useMemo(() => progress.reduce((sum, item) => sum + item.volume, 0), [progress]);
   const totalSets = useMemo(() => progress.reduce((sum, item) => sum + item.sets, 0), [progress]);
   const topExercise = progress[0];
+  const muscleGroupWeeklyVolume = useMemo(() => buildMuscleGroupWeeklyVolume(setLogs), [setLogs]);
+  const maxMuscleGroupVolume = useMemo(
+    () => Math.max(...muscleGroupWeeklyVolume.map((item) => item.volume), 1),
+    [muscleGroupWeeklyVolume]
+  );
 
   useEffect(() => {
     if (isSessionLoading) return;
@@ -189,6 +229,28 @@ export default function ProgresoPage() {
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
             <p className="text-[10px] text-zinc-500 uppercase font-bold">Volumen</p>
             <p className="text-xl font-black mt-1">{Math.round(totalVolume)}</p>
+          </div>
+        </section>
+      )}
+
+      {user && !isLoading && muscleGroupWeeklyVolume.length > 0 && (
+        <section className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+          <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Volumen semanal por grupo muscular</p>
+          <div className="mt-4 grid gap-3">
+            {muscleGroupWeeklyVolume.map((item) => (
+              <div key={item.muscleGroup}>
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span className="font-bold text-zinc-300">{item.muscleGroup}</span>
+                  <span className="text-zinc-500">{Math.round(item.volume)} kg · {item.sets} series</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-zinc-900">
+                  <div
+                    className="h-full rounded-full bg-[#CCFF00]"
+                    style={{ width: `${Math.max(8, (item.volume / maxMuscleGroupVolume) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}
