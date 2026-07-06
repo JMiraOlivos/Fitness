@@ -2,6 +2,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from '@/lib/exerciseTaxonomy';
+import { getOptionalUserProfile } from '@/lib/supabaseServer';
 
 export const runtime = 'edge';
 
@@ -42,6 +43,24 @@ export async function POST(req: Request) {
     const { restricciones = 'Sin restricciones', diasDisponibles = 4, enfoque = 'Hipertrofia' } = await req.json();
     const google = createGoogleGenerativeAI({ apiKey });
 
+    // Best-effort: an anonymous or invalid-token caller still gets a routine generated
+    // exactly as before, just without profile personalization.
+    const profile = await getOptionalUserProfile(req);
+
+    const restriccionesCompletas = profile?.injury_notes
+      ? `${restricciones}. Restricciones persistentes del perfil del usuario (siempre aplican, aunque no se repitan arriba): ${profile.injury_notes}`
+      : restricciones;
+
+    const perfilContext = profile
+      ? [
+          profile.training_goal ? `- Objetivo declarado en su perfil: ${profile.training_goal}` : null,
+          profile.experience_level ? `- Nivel de experiencia: ${profile.experience_level}` : null,
+          profile.equipment_available ? `- Equipo disponible: ${profile.equipment_available}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n      ')
+      : '';
+
     const result = await generateObject({
       model: google('gemini-2.5-flash'),
       system: `Eres un entrenador personal experto y científico del deporte.
@@ -50,7 +69,7 @@ export async function POST(req: Request) {
       prompt: `Genera una rutina de entrenamiento con las siguientes especificaciones actuales:
       - Días disponibles esta semana: ${diasDisponibles}
       - Enfoque del entrenamiento: ${enfoque}
-      - Restricciones o lesiones actuales: ${restricciones}`,
+      - Restricciones o lesiones actuales: ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ''}`,
       schema: rutinaSchema,
     });
 

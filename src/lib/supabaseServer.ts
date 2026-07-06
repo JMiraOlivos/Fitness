@@ -35,3 +35,22 @@ export async function getAuthenticatedClient(req: Request) {
 
   return { supabase, user: data.user };
 }
+
+// Best-effort profile lookup for routes that should still work for anonymous callers
+// (e.g. previewing a routine before signing up) but personalize when a valid token is
+// present. Never throws — any missing/invalid token or lookup failure just yields null.
+export async function getOptionalUserProfile(req: Request) {
+  const auth = await getAuthenticatedClient(req);
+
+  if ("error" in auth) {
+    return null;
+  }
+
+  const { data } = await auth.supabase
+    .from("profiles")
+    .select("training_goal, injury_notes, equipment_available, experience_level")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+
+  return data;
+}

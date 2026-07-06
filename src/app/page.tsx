@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { BrainCircuit, CheckCircle2, Dumbbell, History, Loader2, LogOut, Play, Save, Sparkles, TrendingUp } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { BrainCircuit, CheckCircle2, Dumbbell, History, Loader2, LogOut, Play, Save, Sparkles, TrendingUp, UserCog } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
@@ -115,7 +115,7 @@ function getLastWorkoutLabel(workouts: MetricWorkout[]) {
 export default function Dashboard() {
   const [diasDisponibles, setDiasDisponibles] = useState("4");
   const [enfoque, setEnfoque] = useState("Hipertrofia upper/lower");
-  const [restricciones, setRestricciones] = useState("Sin dominadas, sin sentadillas búlgaras y priorizar poleas");
+  const [restricciones, setRestricciones] = useState("");
   const [rutinasIA, setRutinasIA] = useState<RutinaIA[]>([]);
   const [rutinasGuardadas, setRutinasGuardadas] = useState<RutinaGuardada[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics>(initialMetrics);
@@ -127,17 +127,33 @@ export default function Dashboard() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const precargarPerfil = useCallback(async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("training_goal, injury_notes")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!data) return;
+
+    if (data.training_goal) setEnfoque(data.training_goal);
+    if (data.injury_notes) setRestricciones(data.injury_notes);
+  }, [user]);
+
   useEffect(() => {
     if (isSessionLoading) return;
 
     if (user) {
       void cargarRutinasGuardadas();
       void cargarMetricasDashboard();
+      void precargarPerfil();
     } else {
       setRutinasGuardadas([]);
       setMetrics(initialMetrics);
     }
-  }, [user, isSessionLoading]);
+  }, [user, isSessionLoading, precargarPerfil]);
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -228,9 +244,17 @@ export default function Dashboard() {
     setSuccessMessage(null);
 
     try {
+      // Best-effort: attach the access token when logged in so the route can merge
+      // profile preferences (see /perfil); anonymous callers still get a preview.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
       const response = await fetch("/api/ai/generar-rutina", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({ diasDisponibles: Number(diasDisponibles), enfoque, restricciones }),
       });
 
@@ -288,9 +312,14 @@ export default function Dashboard() {
             <p className="text-xs text-zinc-500 mt-1">{user ? user.email : "Usa email y contraseña para guardar progreso."}</p>
           </div>
           {user ? (
-            <button onClick={cerrarSesion} className="rounded-full bg-zinc-900 p-3 text-zinc-400">
-              <LogOut className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <Link href="/perfil" className="rounded-full bg-zinc-900 p-3 text-zinc-400">
+                <UserCog className="h-5 w-5" />
+              </Link>
+              <button onClick={cerrarSesion} className="rounded-full bg-zinc-900 p-3 text-zinc-400">
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
           ) : (
             <Link href="/auth" className="rounded-full bg-[#CCFF00] px-4 py-2 text-xs font-black text-black">
               Ingresar
@@ -342,7 +371,13 @@ export default function Dashboard() {
           </label>
           <label className="grid gap-1 text-sm">
             <span className="text-zinc-400">Restricciones</span>
-            <textarea value={restricciones} onChange={(event) => setRestricciones(event.target.value)} rows={3} className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00] resize-none" />
+            <textarea
+              value={restricciones}
+              onChange={(event) => setRestricciones(event.target.value)}
+              rows={3}
+              placeholder="Ej: molestia en el hombro derecho, evitar sentadilla libre"
+              className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00] resize-none"
+            />
           </label>
           <button onClick={generarRutina} disabled={isGenerating} className="w-full bg-[#CCFF00] text-black rounded-2xl py-3 font-black inline-flex items-center justify-center gap-2 disabled:opacity-60">
             {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}

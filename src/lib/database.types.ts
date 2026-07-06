@@ -17,6 +17,10 @@ export type Database = {
           updated_at: string | null;
           full_name: string | null;
           preferred_unit: string | null;
+          training_goal: string | null;
+          injury_notes: string | null;
+          equipment_available: string | null;
+          experience_level: string | null;
           created_at: string;
         };
         Insert: {
@@ -24,6 +28,10 @@ export type Database = {
           updated_at?: string | null;
           full_name?: string | null;
           preferred_unit?: string | null;
+          training_goal?: string | null;
+          injury_notes?: string | null;
+          equipment_available?: string | null;
+          experience_level?: string | null;
           created_at?: string;
         };
         Update: {
@@ -31,6 +39,10 @@ export type Database = {
           updated_at?: string | null;
           full_name?: string | null;
           preferred_unit?: string | null;
+          training_goal?: string | null;
+          injury_notes?: string | null;
+          equipment_available?: string | null;
+          experience_level?: string | null;
           created_at?: string;
         };
         Relationships: [];
