@@ -128,7 +128,7 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 
 ---
 
-## Fase 6 - Arquitectura y seguridad productiva
+## Fase 6 - Arquitectura y seguridad productiva ✅ (completa, 2026-07-06)
 
 > **Reordenada antes de la Fase 5** por la auditoría: construir más UI de gimnasio sobre 5 archivos con tipos duplicados y sin capa de servidor solo agranda la deuda. `database.types.ts` y la consolidación de migraciones (Fase 0) deben ir primero.
 
@@ -136,16 +136,16 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 
 ### Alcance técnico
 
-- Generar tipos Supabase (`database.types.ts`) como fuente única de verdad — hacerlo primero, antes de los ítems siguientes.
+- ✅ `database.types.ts` (`src/lib/database.types.ts`) como fuente única de verdad, escrito a mano desde `schema.sql` + migraciones (el entorno de desarrollo no tenía red hacia la Management API de Supabase para generarlo con la CLI) y conectado a `createClient<Database>()`.
 - ✅ Extraído a `src/lib` el helper de join duplicado (`one()`, ahora en `src/lib/supabaseJoins.ts`) y la fórmula de 1RM (ahora en `src/lib/oneRepMax.ts`, con guard de rango) — resuelto en Fase 0.
-- Proveedor de sesión/auth compartido (`useSession()`), reemplazando las 7 llamadas independientes a `supabase.auth.getUser()`.
-- Mover writes críticos (guardar rutina, registrar serie, finalizar entrenamiento) a Server Actions/API routes — recién después de tener `database.types.ts`.
-- Guardar rutinas mediante operación transaccional (ya resuelto por RPC; falta consolidar migraciones — ver Fase 0).
-- Deduplicar ejercicios (ya resuelto parcialmente; falta la taxonomía de grupos musculares — ver Fase 8).
-- Separar ejercicios globales y ejercicios personalizados.
-- Paginación/"cargar más" en `/historial` (hoy `.limit(30)`) y en el detalle de ejercicio (hoy `.limit(100)`).
-- Agregar CI (typecheck + lint + build) como red de seguridad antes de este refactor, y tests después.
-- Revisar RLS con casos borde.
+- ✅ Proveedor de sesión/auth compartido (`useSession()` en `src/components/SessionProvider.tsx`, montado en el layout raíz), reemplazando las 7 llamadas independientes a `supabase.auth.getUser()` (incluida la suscripción `onAuthStateChange` que el dashboard ya armaba a mano).
+- ✅ Writes críticos movidos a API routes: `POST /api/routines/save`, `/api/workouts/start`, `/api/workouts/log-set`, `/api/workouts/finish`. Cada ruta arma un cliente de Supabase con el access token del usuario (no service role), así que RLS sigue aplicando igual que en el cliente. Esto eliminó el fallback legacy no atómico de guardado de rutina (`guardarRutinaLegacy`), lo que a su vez permitió cerrar el hueco de RLS en `exercises` (ver siguiente ítem). **Nota:** no se pudo probar en vivo contra el proyecto real — la política de red del entorno de desarrollo bloquea toda salida hacia Supabase (Management API y el propio host del proyecto) — probar manualmente el flujo completo (generar → guardar rutina, registrar serie, finalizar entrenamiento) antes de confiar en producción.
+- ✅ Guardar rutinas mediante operación transaccional (ya resuelto por RPC; migraciones consolidadas en Fase 0).
+- ✅ Deduplicación de ejercicios (ya resuelto parcialmente; falta la taxonomía de grupos musculares — ver Fase 8).
+- ✅ Separados ejercicios globales y personalizados: columna `owner_id` nullable en `exercises` (null = global) + RLS actualizada. Sin feature de UI todavía que cree ejercicios personales — cambio preparatorio, no rompe el comportamiento actual (dedup global sigue funcionando, verificado).
+- ✅ Paginación/"cargar más" en `/historial` (antes `.limit(30)`) y en el detalle de ejercicio (antes `.limit(100)`), con `.range()`.
+- ✅ CI (typecheck + lint + build) vía GitHub Actions (`.github/workflows/ci.yml`). Tests unitarios/integración siguen pendientes (ver "Cobertura de tests" más abajo).
+- ✅ RLS revisada con casos borde: encontrado y corregido que `workout_logs` no validaba que `routine_id` perteneciera al mismo usuario; documentado (y luego cerrado) que `exercises` permitía insert directo del cliente.
 
 ---
 
@@ -210,14 +210,14 @@ Ampliar más allá del esqueleto de CI de la Fase 6: tests unitarios para volume
 
 ## Curación de la librería de ejercicios
 
-`exercises` es de lectura/escritura global para cualquier usuario autenticado, sin moderación. Suficiente para el MVP, pero a medida que crezca la inversión en taxonomía (Fase 8) y contenido técnico, revisar un flujo de curación para no diluir la calidad.
+Los ejercicios globales (`owner_id is null`, ver Fase 6) se crean solo a través del RPC `save_ai_routine`, sin moderación — cualquier usuario que genere una rutina puede agregar entradas nuevas al catálogo compartido. Suficiente para el MVP, pero a medida que crezca la inversión en taxonomía (Fase 8) y contenido técnico, revisar un flujo de curación para no diluir la calidad.
 
 ---
 
 ## Prioridad inmediata
 
 1. ~~**Fase 0**~~ — ✅ completa: prompt hardcodeado quitado, docs de auth alineadas, código muerto borrado, migraciones RPC consolidadas, guard de 1RM agregado.
-2. **Fase 6** — `database.types.ts` (pendiente), proveedor de sesión, server actions, paginación, CI. (Helpers compartidos y fórmula de 1RM ya se adelantaron en Fase 0.)
+2. ~~**Fase 6**~~ — ✅ completa: `database.types.ts`, proveedor de sesión, writes críticos movidos a API routes, ejercicios globales/personales separados, paginación, CI, RLS revisada.
 3. **Fase 8 (fundamentos de datos)** — taxonomía de grupos musculares, flag de calentamiento, perfil persistente, granularidad de RPE.
 4. **Fase 5 + Fase 8 (features visibles)** — ~~timer de descanso~~ y ~~"igual que la vez pasada"~~ se pueden adelantar en paralelo; "igual que la vez pasada" ya está ✅ hecho. El resto de Fase 8 sigue a sus fundamentos de datos.
 5. **Fase 7** — PWA, al final.
