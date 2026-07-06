@@ -110,7 +110,7 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 
 ## Fase 4 - IA post-entrenamiento ✅ (completa, con límites — ver auditoría)
 
-> La auditoría encontró que el insight post-entrenamiento solo recibe los agregados de la sesión actual, no la tendencia histórica — estructuralmente no puede "detectar fatiga o estancamiento" ni "sugerir deload" como plantea el alcance original de esta fase. Ese trabajo queda movido a la Fase 8.
+> La auditoría encontró que el insight post-entrenamiento solo recibe los agregados de la sesión actual, no la tendencia histórica — estructuralmente no puede "detectar fatiga o estancamiento" ni "sugerir deload" como plantea el alcance original de esta fase. ✅ Resuelto en Fase 8: ahora recibe hasta 4 sesiones previas por ejercicio.
 
 **Objetivo:** que la IA deje de solo generar rutinas y empiece a actuar como coach.
 
@@ -176,15 +176,16 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 - ✅ Perfil de usuario persistente (`profiles.training_goal/injury_notes/equipment_available/experience_level`), con pantalla `/perfil` y wireado a `generar-rutina`: las lesiones persistentes ahora siempre viajan al prompt de Gemini, sin depender de que el usuario las retipee — esta es la corrección real del bug de la Fase 0.
 - ✅ Granularidad de RPE: `set_logs.rpe` pasó a `numeric(3,1)`, permite medios puntos (7.5, 8.5...) en vez de solo enteros.
 
-### Alcance funcional — features visibles (dependen de lo anterior)
+### Alcance funcional — features visibles (dependen de lo anterior) ✅ mayormente completa (2026-07-06)
 
-- Vista de volumen semanal por grupo muscular (depende de la taxonomía).
-- Periodización real / sobrecarga progresiva en la generación de rutinas, alimentada con historial real del usuario (depende del perfil persistente).
-- Insight post-entrenamiento usando tendencia histórica de varias sesiones, no solo la actual — para cumplir lo que la Fase 4 prometía (detectar fatiga, sugerir deload).
-- Registro de peso corporal / medidas corporales (tabla + pantalla nuevas, hoy no existe ninguna).
-- Sustitución de ejercicio en plena sesión por dolor/equipo no disponible (depende de la taxonomía).
-- Cues técnicos e instrucciones/medios por ejercicio (esfuerzo mayormente de contenido, no de schema).
-- Mesociclos/programas de entrenamiento con semanas de descarga programadas — el ítem más ambicioso, al final, una vez el resto de esta fase esté resuelto.
+- ✅ Vista de volumen semanal por grupo muscular, en `/progreso` (reutiliza los `set_logs` de 90 días ya cargados, sin query adicional).
+- ✅ Sobrecarga progresiva real en la generación de rutinas: `generar-rutina` ahora recibe el desempeño reciente del usuario por ejercicio (peso/reps/RPE de la última vez, hasta 15 ejercicios) y se le instruye aplicar sobrecarga progresiva en vez de generar números genéricos.
+- ✅ Insight post-entrenamiento con tendencia histórica: ahora incluye hasta 4 sesiones previas por ejercicio (volumen, peso máximo, RPE promedio) además de la sesión de hoy, para poder detectar fatiga/estancamiento real y sugerir deload — cumple lo que la Fase 4 prometía.
+- ✅ Registro de peso corporal / medidas corporales: tabla `body_measurements` nueva + pantalla `/progreso/peso` (peso, % grasa opcional, notas, tendencia vs. registro anterior y vs. el primero).
+- ✅ Sustitución de ejercicio en plena sesión: botón "Sustituir" en `/entrenar/[routineId]` que lista otros ejercicios globales del mismo grupo muscular y actualiza `routine_exercises.exercise_id` (persiste para futuras sesiones de la rutina).
+- **Diferido, fuera de este alcance:**
+  - Cues técnicos e instrucciones/medios por ejercicio — es esfuerzo de contenido (videos/imágenes/instrucciones reales por ejercicio), no de ingeniería; no hay fuente de contenido para autogenerar esto de forma confiable. El campo `notas` que Gemini ya genera por ejercicio en cada rutina cubre parcialmente esta necesidad hoy.
+  - Mesociclos/programas de entrenamiento con semanas de descarga programadas — el ítem más ambicioso de la fase; el roadmap ya lo marcaba "al final, una vez el resto esté resuelto", y sigue sin un diseño concreto (duración de mesociclo, criterios de deload automático, etc.) que amerite su propia sesión de trabajo dedicada.
 
 ---
 
@@ -219,5 +220,6 @@ Los ejercicios globales (`owner_id is null`, ver Fase 6) se crean solo a través
 1. ~~**Fase 0**~~ — ✅ completa: prompt hardcodeado quitado, docs de auth alineadas, código muerto borrado, migraciones RPC consolidadas, guard de 1RM agregado.
 2. ~~**Fase 6**~~ — ✅ completa: `database.types.ts`, proveedor de sesión, writes críticos movidos a API routes, ejercicios globales/personales separados, paginación, CI, RLS revisada.
 3. ~~**Fase 8 (fundamentos de datos)**~~ — ✅ completa: taxonomía de grupos musculares, flag de calentamiento, perfil persistente wireado a `generar-rutina`, granularidad de RPE.
-4. **Fase 5 + Fase 8 (features visibles)** — ~~timer de descanso~~ y ~~"igual que la vez pasada"~~ se pueden adelantar en paralelo; "igual que la vez pasada" ya está ✅ hecho. El resto de Fase 5 (botones rápidos, autoscroll, marcar ejercicio completado) y las features visibles de Fase 8 (volumen por grupo muscular, periodización real, insight con tendencia histórica, registro de peso corporal, sustitución de ejercicio, cues técnicos, mesociclos) ya tienen sus fundamentos listos.
-5. **Fase 7** — PWA, al final.
+4. ~~**Fase 8 (features visibles)**~~ — ✅ mayormente completa: volumen por grupo muscular, sobrecarga progresiva real en generación de rutinas, insight post-entrenamiento con tendencia histórica, registro de peso corporal, sustitución de ejercicio en sesión. Quedan diferidos cues técnicos/contenido (no es trabajo de ingeniería) y mesociclos (el ítem más ambicioso, sin diseño concreto todavía).
+5. **Fase 5 (resto)** — ~~timer de descanso~~ y ~~"igual que la vez pasada"~~ ya hechos; falta botones rápidos (+2.5kg/-2.5kg/+1 rep), autoscroll al siguiente ejercicio, marcar ejercicio como completado, estado visual de progreso dentro de la rutina.
+6. **Fase 7** — PWA, al final.
