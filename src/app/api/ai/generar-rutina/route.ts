@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from '@/lib/exerciseTaxonomy';
 
 export const runtime = 'edge';
 
@@ -16,8 +17,8 @@ const rutinaSchema = z.object({
       ejercicios: z.array(
         z.object({
           nombre: z.string().describe('Nombre del ejercicio en español'),
-          musculoObjetivo: z.string().describe('Pecho, Dorsal, Hombro, Cuádriceps, Isquios, etc.'),
-          equipamiento: z.enum(['Polea', 'Barra', 'Máquina', 'Mancuerna', 'Corporal']),
+          musculoObjetivo: z.enum(MUSCLE_GROUPS),
+          equipamiento: z.enum(EQUIPMENT_TYPES),
           seriesObjetivo: z.number().default(3),
           repeticionesObjetivo: z.string().describe('Rango de reps, ej: "8-10" o "12-15"'),
           notas: z.string().describe('Consejo técnico de ejecución para este ejercicio'),
