@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Dumbbell, Loader2, Play, Plus, Sparkles, Square } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Dumbbell, Loader2, Play, Plus, Repeat, Sparkles, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
@@ -154,6 +154,10 @@ export default function EntrenarPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Record<string, ExerciseSuggestion>>({});
+  const [substitutingItemId, setSubstitutingItemId] = useState<string | null>(null);
+  const [substituteOptions, setSubstituteOptions] = useState<ExerciseRow[]>([]);
+  const [isLoadingSubstitutes, setIsLoadingSubstitutes] = useState(false);
+  const [isSubstituting, setIsSubstituting] = useState(false);
 
   const routineExercises = useMemo(() => {
     return [...(routine?.routine_exercises || [])].sort((a, b) => a.order_index - b.order_index);
@@ -273,6 +277,70 @@ export default function EntrenarPage() {
       weight: String(suggestion.suggestedWeight),
       reps: String(suggestion.lastReps),
     });
+  }
+
+  async function abrirSustitucion(item: RoutineExerciseRow) {
+    const exercise = one(item.exercises);
+    if (!exercise) return;
+
+    setError(null);
+    setSubstitutingItemId(item.id);
+    setSubstituteOptions([]);
+    setIsLoadingSubstitutes(true);
+
+    const { data, error: loadError } = await supabase
+      .from("exercises")
+      .select("id, name, target_muscle, equipment")
+      .eq("target_muscle", exercise.target_muscle)
+      .is("owner_id", null)
+      .neq("id", exercise.id)
+      .order("name")
+      .limit(20);
+
+    setIsLoadingSubstitutes(false);
+
+    if (loadError) {
+      setError(loadError.message);
+      return;
+    }
+
+    setSubstituteOptions((data || []) as ExerciseRow[]);
+  }
+
+  function cerrarSustitucion() {
+    setSubstitutingItemId(null);
+    setSubstituteOptions([]);
+  }
+
+  async function sustituirEjercicio(item: RoutineExerciseRow, nuevoEjercicio: ExerciseRow) {
+    setIsSubstituting(true);
+    setError(null);
+
+    const { error: updateError } = await supabase
+      .from("routine_exercises")
+      .update({ exercise_id: nuevoEjercicio.id })
+      .eq("id", item.id);
+
+    setIsSubstituting(false);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setRoutine((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        routine_exercises: (current.routine_exercises || []).map((routineExercise) =>
+          routineExercise.id === item.id ? { ...routineExercise, exercises: nuevoEjercicio } : routineExercise
+        ),
+      };
+    });
+
+    setSuccessMessage(`${one(item.exercises)?.name || "Ejercicio"} sustituido por ${nuevoEjercicio.name}.`);
+    cerrarSustitucion();
   }
 
   async function ensureWorkoutLog() {
@@ -609,7 +677,16 @@ export default function EntrenarPage() {
                   <h2 className="text-xl font-black">{exercise?.name || "Ejercicio"}</h2>
                   <p className="text-xs text-zinc-500 mt-1">{exercise?.target_muscle || "Músculo"} • {exercise?.equipment || "Equipo"}</p>
                 </div>
-                <Dumbbell className="h-5 w-5 text-[#CCFF00] shrink-0" />
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <Dumbbell className="h-5 w-5 text-[#CCFF00]" />
+                  <button
+                    type="button"
+                    onClick={() => (substitutingItemId === item.id ? cerrarSustitucion() : void abrirSustitucion(item))}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-400"
+                  >
+                    <Repeat className="h-3 w-3" /> Sustituir
+                  </button>
+                </div>
               </div>
 
               <div className="mb-4 grid grid-cols-3 gap-2">
@@ -628,6 +705,41 @@ export default function EntrenarPage() {
               </div>
 
               {item.notes && <p className="mb-4 text-xs text-zinc-400">{item.notes}</p>}
+
+              {substitutingItemId === item.id && (
+                <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                  <p className="text-[10px] uppercase font-bold text-zinc-400 mb-2">
+                    Sustituir por otro ejercicio de {exercise?.target_muscle || "este grupo muscular"}
+                  </p>
+
+                  {isLoadingSubstitutes && <Loader2 className="h-5 w-5 animate-spin text-[#CCFF00] mx-auto my-2" />}
+
+                  {!isLoadingSubstitutes && substituteOptions.length === 0 && (
+                    <p className="text-xs text-zinc-500">No hay otros ejercicios registrados para este grupo muscular.</p>
+                  )}
+
+                  {!isLoadingSubstitutes && substituteOptions.length > 0 && (
+                    <div className="grid gap-2">
+                      {substituteOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          disabled={isSubstituting}
+                          onClick={() => void sustituirEjercicio(item, option)}
+                          className="flex items-center justify-between rounded-xl bg-zinc-950 px-3 py-2 text-left text-xs disabled:opacity-50"
+                        >
+                          <span className="font-bold text-white">{option.name}</span>
+                          <span className="text-zinc-500">{option.equipment}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <button type="button" onClick={cerrarSustitucion} className="mt-2 text-xs font-bold text-zinc-500">
+                    Cancelar
+                  </button>
+                </div>
+              )}
 
               {suggestion && (
                 <div className="mb-4 rounded-2xl border border-[#CCFF00]/30 bg-[#CCFF00]/5 p-3">
