@@ -24,15 +24,15 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 
 ---
 
-## Fase 0 - Correcciones inmediatas (nueva, prioridad máxima)
+## Fase 0 - Correcciones inmediatas ✅ (completa, 2026-07-06)
 
 **Objetivo:** resolver defectos ya en producción y deuda barata antes de seguir sumando features.
 
-- Quitar las restricciones de ejercicios hardcodeadas del prompt global de `generar-rutina` — deben salir de las preferencias reales del usuario (ver Fase 6/perfil persistente), no de un texto fijo para todos.
-- Alinear el README con el flujo de auth real (email+contraseña) y eliminar o marcar como muerto `src/app/auth/callback/page.tsx` (handler de magic link inalcanzable).
-- Borrar `src/components/ProgressFloatingButton.tsx` (componente sin referencias, superado por `AppNavigation.tsx`).
-- Consolidar en una sola migración idempotente las tres reescrituras del mismo día de `save_ai_routine` / `save_routine_with_exercises` (`20260705_save_ai_routine_rpc.sql` → `20260705_atomic_routine_save.sql` → `20260705_save_routine_transaction.sql`).
-- Agregar un guard de rango de reps a la fórmula de 1RM estimado (hoy da valores poco confiables para series de 15-20 reps) en `progreso/page.tsx` y `progreso/[exerciseId]/page.tsx`.
+- ✅ Quitadas las restricciones de ejercicios hardcodeadas del prompt global de `generar-rutina` — el system prompt ya no impone preferencias fijas; las restricciones reales del usuario siguen viajando solo por `restricciones` (la persistencia real de perfil queda para Fase 6/8).
+- ✅ README alineado con el flujo de auth real (email+contraseña). `src/app/auth/callback/page.tsx` se eliminó: no había ningún link ni `emailRedirectTo`/`signInWithOtp` que lo alcanzara, era código muerto del magic link previo al pivote (recuperable desde git history si se reactiva ese flujo).
+- ✅ Borrado `src/components/ProgressFloatingButton.tsx` (sin referencias, superado por `AppNavigation.tsx`).
+- ✅ Consolidadas `20260705_save_ai_routine_rpc.sql` → `20260705_atomic_routine_save.sql` → `20260705_save_routine_transaction.sql` en `20260706_consolidate_save_routine_rpc.sql`, una sola migración idempotente y retrocompatible con entornos que ya corrieron cualquiera de las tres versiones anteriores (validado localmente contra Postgres).
+- ✅ Guard de rango agregado a la fórmula de 1RM estimado (no se muestra estimación para series de más de 12 reps) y extraída a `src/lib/oneRepMax.ts`; de paso se consolidó el helper `one()`/`getJoinedExercise()` duplicado en 5 archivos a `src/lib/supabaseJoins.ts`.
 
 ---
 
@@ -137,7 +137,7 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 ### Alcance técnico
 
 - Generar tipos Supabase (`database.types.ts`) como fuente única de verdad — hacerlo primero, antes de los ítems siguientes.
-- Extraer a `src/lib` el helper de join duplicado (`one()` / `getJoinedExercise()`, copiado hoy en 5 archivos) y la fórmula de 1RM (duplicada y ya divergente entre `progreso/page.tsx` y `progreso/[exerciseId]/page.tsx`).
+- ✅ Extraído a `src/lib` el helper de join duplicado (`one()`, ahora en `src/lib/supabaseJoins.ts`) y la fórmula de 1RM (ahora en `src/lib/oneRepMax.ts`, con guard de rango) — resuelto en Fase 0.
 - Proveedor de sesión/auth compartido (`useSession()`), reemplazando las 7 llamadas independientes a `supabase.auth.getUser()`.
 - Mover writes críticos (guardar rutina, registrar serie, finalizar entrenamiento) a Server Actions/API routes — recién después de tener `database.types.ts`.
 - Guardar rutinas mediante operación transaccional (ya resuelto por RPC; falta consolidar migraciones — ver Fase 0).
@@ -216,8 +216,8 @@ Ampliar más allá del esqueleto de CI de la Fase 6: tests unitarios para volume
 
 ## Prioridad inmediata
 
-1. **Fase 0** — quitar el prompt hardcodeado, alinear docs de auth, borrar código muerto, consolidar migraciones RPC, guard de 1RM.
-2. **Fase 6** — `database.types.ts`, helpers compartidos, proveedor de sesión, server actions, paginación, CI.
+1. ~~**Fase 0**~~ — ✅ completa: prompt hardcodeado quitado, docs de auth alineadas, código muerto borrado, migraciones RPC consolidadas, guard de 1RM agregado.
+2. **Fase 6** — `database.types.ts` (pendiente), proveedor de sesión, server actions, paginación, CI. (Helpers compartidos y fórmula de 1RM ya se adelantaron en Fase 0.)
 3. **Fase 8 (fundamentos de datos)** — taxonomía de grupos musculares, flag de calentamiento, perfil persistente, granularidad de RPE.
 4. **Fase 5 + Fase 8 (features visibles)** — timer de descanso y "igual que la vez pasada" se pueden adelantar en paralelo; el resto de Fase 8 sigue a sus fundamentos de datos.
 5. **Fase 7** — PWA, al final.
