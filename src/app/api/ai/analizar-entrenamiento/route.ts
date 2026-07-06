@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { getExerciseSessionHistory, resolveOptionalAuth } from '@/lib/supabaseServer';
 
 export const runtime = 'edge';
 
@@ -38,14 +39,45 @@ export async function POST(req: Request) {
 
     const google = createGoogleGenerativeAI({ apiKey });
 
+    // Best-effort: an anonymous or invalid-token caller still gets an insight from
+    // just this session's numbers, matching the previous behavior.
+    const auth = await resolveOptionalAuth(req);
+    const exerciseIds: string[] = Array.isArray(payload.exerciseSummaries)
+      ? payload.exerciseSummaries.map((item: { exerciseId?: string }) => item.exerciseId).filter(Boolean)
+      : [];
+
+    const history = await getExerciseSessionHistory(auth, exerciseIds, payload.workoutLogId || null);
+
+    const historialContext = Object.keys(history).length > 0
+      ? `\nTendencia de sesiones anteriores por ejercicio (de más reciente a más antigua, no incluye la sesión de hoy):\n${Array.isArray(payload.exerciseSummaries)
+          ? payload.exerciseSummaries
+              .filter((item: { exerciseId?: string }) => item.exerciseId && history[item.exerciseId]?.length > 0)
+              .map((item: { exerciseId: string; exerciseName: string }) => {
+                const points = history[item.exerciseId]
+                  .map(
+                    (point) =>
+                      `${Math.round(point.volume)}kg vol / ${point.maxWeight}kg máx${
+                        point.averageRpe !== null ? ` / RPE ${point.averageRpe.toFixed(1)}` : ''
+                      } (hace ${point.daysAgo}d)`
+                  )
+                  .join(' → ');
+                return `- ${item.exerciseName}: ${points}`;
+              })
+              .join('\n')
+          : ''}`
+      : '';
+
     const result = await generateObject({
       model: google('gemini-2.5-flash'),
       schema: insightSchema,
       system: `Eres un coach de fuerza e hipertrofia. Entregas feedback práctico, breve y accionable.
-      Debes analizar volumen, cantidad de series, RPE promedio y ejercicios registrados.
+      Debes analizar volumen, cantidad de series, RPE promedio y ejercicios registrados de la sesión de hoy.
+      Cuando recibas la tendencia de sesiones anteriores por ejercicio, úsala para detectar fatiga o estancamiento real
+      (volumen o peso bajando, o RPE subiendo sesión tras sesión) y para sugerir un deload cuando corresponda —
+      no te limites a comentar solo la sesión de hoy si hay tendencia disponible.
       No des recomendaciones médicas. Si ves RPE muy alto, sugiere controlar fatiga.`,
       prompt: `Analiza este entrenamiento y devuelve un insight útil para el usuario:
-      ${JSON.stringify(payload)}`,
+      ${JSON.stringify(payload)}${historialContext}`,
     });
 
     return Response.json(result.object);

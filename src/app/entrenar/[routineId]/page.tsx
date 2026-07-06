@@ -404,6 +404,7 @@ export default function EntrenarPage() {
         const logs = (exercise?.id ? setLogs[exercise.id] || [] : []).filter((log) => !log.is_warmup);
 
         return {
+          exerciseId: exercise?.id || null,
           exerciseName: exercise?.name || "Ejercicio",
           targetMuscle: exercise?.target_muscle || "",
           sets: logs.length,
@@ -415,10 +416,16 @@ export default function EntrenarPage() {
       .filter((summary) => summary.sets > 0);
 
     try {
+      // Best-effort: attach the access token so the route can pull each exercise's
+      // trend across prior sessions; still works without one.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
       const response = await fetch("/api/ai/analizar-entrenamiento", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({
           routineTitle: routine?.title,
@@ -428,6 +435,7 @@ export default function EntrenarPage() {
           averageRpe,
           startedAt: startTime?.toISOString(),
           finishedAt: new Date().toISOString(),
+          workoutLogId,
           exerciseSummaries,
         }),
       });

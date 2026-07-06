@@ -112,3 +112,85 @@ export async function getRecentPerformanceSummary(auth: OptionalAuth, limit = 15
 
   return summary;
 }
+
+export type ExerciseSessionPoint = {
+  volume: number;
+  maxWeight: number;
+  averageRpe: number | null;
+  daysAgo: number;
+};
+
+// Per-exercise aggregates for the last few prior workout sessions (excluding the one
+// just finished), newest first — lets the post-workout insight reason about a real
+// trend across sessions instead of only the numbers from today. Best-effort: an
+// anonymous/invalid-token caller (or no exercise ids) just yields no history.
+export async function getExerciseSessionHistory(
+  auth: OptionalAuth,
+  exerciseIds: string[],
+  excludeWorkoutLogId: string | null,
+  sessionsPerExercise = 4
+): Promise<Record<string, ExerciseSessionPoint[]>> {
+  if (!auth || exerciseIds.length === 0) return {};
+
+  const { data } = await auth.supabase
+    .from("set_logs")
+    .select("exercise_id, workout_log_id, weight, reps, rpe, created_at")
+    .in("exercise_id", exerciseIds)
+    .eq("is_warmup", false)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (!data) return {};
+
+  type SessionAgg = {
+    volume: number;
+    maxWeight: number;
+    rpeSum: number;
+    rpeCount: number;
+    latestCreatedAt: string;
+  };
+
+  const byExercise = new Map<string, Map<string, SessionAgg>>();
+
+  for (const row of data) {
+    if (excludeWorkoutLogId && row.workout_log_id === excludeWorkoutLogId) continue;
+
+    let sessions = byExercise.get(row.exercise_id);
+    if (!sessions) {
+      sessions = new Map();
+      byExercise.set(row.exercise_id, sessions);
+    }
+
+    let session = sessions.get(row.workout_log_id);
+    if (!session) {
+      session = { volume: 0, maxWeight: 0, rpeSum: 0, rpeCount: 0, latestCreatedAt: row.created_at };
+      sessions.set(row.workout_log_id, session);
+    }
+
+    const weight = Number(row.weight);
+    const reps = Number(row.reps);
+    session.volume += weight * reps;
+    session.maxWeight = Math.max(session.maxWeight, weight);
+    if (row.rpe !== null) {
+      session.rpeSum += Number(row.rpe);
+      session.rpeCount += 1;
+    }
+  }
+
+  const now = Date.now();
+  const result: Record<string, ExerciseSessionPoint[]> = {};
+
+  for (const [exerciseId, sessions] of byExercise) {
+    result[exerciseId] = Array.from(sessions.values())
+      .sort((a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime())
+      .slice(0, sessionsPerExercise)
+      .map((session) => ({
+        volume: session.volume,
+        maxWeight: session.maxWeight,
+        averageRpe: session.rpeCount > 0 ? session.rpeSum / session.rpeCount : null,
+        daysAgo: Math.max(0, Math.round((now - new Date(session.latestCreatedAt).getTime()) / 86_400_000)),
+      }));
+  }
+
+  return result;
+}
