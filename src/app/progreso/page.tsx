@@ -192,8 +192,15 @@ export default function ProgresoPage() {
       </Link>
 
       <header className="mb-8">
-        <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Progreso</p>
-        <h1 className="text-3xl font-black tracking-tight mt-1">Por ejercicio</h1>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Progreso</p>
+            <h1 className="text-3xl font-black tracking-tight mt-1">Por ejercicio</h1>
+          </div>
+          <Link href="/progreso/peso" className="shrink-0 rounded-full bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 border border-zinc-800">
+            Peso corporal
+          </Link>
+        </div>
         <p className="text-sm text-zinc-400 mt-2">Resumen de los últimos 90 días con volumen, series y mejores marcas.</p>
       </header>
 

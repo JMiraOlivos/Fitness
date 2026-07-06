@@ -244,6 +244,44 @@ export type Database = {
           },
         ];
       };
+      body_measurements: {
+        Row: {
+          id: string;
+          user_id: string;
+          recorded_at: string;
+          weight_kg: number;
+          body_fat_percentage: number | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          recorded_at?: string;
+          weight_kg: number;
+          body_fat_percentage?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          recorded_at?: string;
+          weight_kg?: number;
+          body_fat_percentage?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "body_measurements_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: {
