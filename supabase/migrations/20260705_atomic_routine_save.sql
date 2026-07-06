@@ -2,7 +2,14 @@
 -- Saves a routine, deduplicates exercises, and creates routine_exercises in one database transaction.
 -- Requires the exercises_normalized_identity_idx unique index from 20260705_harden_exercise_deduplication.sql.
 
-create or replace function public.save_routine_with_exercises(
+begin;
+
+-- PostgreSQL does not allow CREATE OR REPLACE FUNCTION to rename input parameters.
+-- Drop the exact signatures first so this migration can be re-run safely from Supabase SQL Editor.
+drop function if exists public.save_ai_routine(jsonb);
+drop function if exists public.save_routine_with_exercises(text, text, jsonb);
+
+create function public.save_routine_with_exercises(
   p_title text,
   p_description text,
   p_exercises jsonb
@@ -115,7 +122,7 @@ $$;
 
 grant execute on function public.save_routine_with_exercises(text, text, jsonb) to authenticated;
 
-create or replace function public.save_ai_routine(p_routine jsonb)
+create function public.save_ai_routine(p_routine jsonb)
 returns uuid
 language plpgsql
 security definer
@@ -135,3 +142,5 @@ end;
 $$;
 
 grant execute on function public.save_ai_routine(jsonb) to authenticated;
+
+commit;
