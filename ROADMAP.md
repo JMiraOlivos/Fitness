@@ -149,19 +149,19 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 
 ---
 
-## Fase 5 - UX de gimnasio
+## Fase 5 - UX de gimnasio ✅ (completa, 2026-07-06)
 
 **Objetivo:** que registrar una serie sea rápido y cómodo durante el entrenamiento.
 
 ### Alcance funcional
 
 - ✅ Prellenado "igual que la vez pasada" — `/entrenar/[routineId]` muestra por ejercicio la última sesión registrada (peso/reps/RPE, en cualquier rutina) junto con una sugerencia de progresión (subir, mantener o bajar carga según el RPE promedio) y un botón para aplicarla a los inputs de la serie actual.
-- Botón para copiar serie anterior.
-- Botones rápidos `+2.5 kg`, `-2.5 kg`, `+1 rep`.
-- Timer de descanso — sin dependencias, también adelantable.
-- Autoscroll al siguiente ejercicio.
-- Marcar ejercicio como completado.
-- Estado visual de progreso dentro de la rutina.
+- ✅ Botón "Copiar serie anterior" — copia peso/reps/RPE de la última serie registrada para ese ejercicio en la sesión actual (distinto de "igual que la vez pasada", que mira la sesión anterior).
+- ✅ Botones rápidos `+2.5 kg`, `-2.5 kg`, `+1 rep` junto a los inputs de peso y reps.
+- ✅ Timer de descanso — 90s automático al registrar una serie, banner flotante descartable sobre la barra de navegación.
+- ✅ Autoscroll al siguiente ejercicio — al marcar un ejercicio como completado, hace scroll suave al siguiente pendiente.
+- ✅ Marcar ejercicio como completado — toggle independiente de las series hechas, atenúa visualmente la tarjeta.
+- ✅ Estado visual de progreso dentro de la rutina — barra "X/N ejercicios completados" junto a Estado/Inicio.
 
 ---
 
@@ -221,5 +221,5 @@ Los ejercicios globales (`owner_id is null`, ver Fase 6) se crean solo a través
 2. ~~**Fase 6**~~ — ✅ completa: `database.types.ts`, proveedor de sesión, writes críticos movidos a API routes, ejercicios globales/personales separados, paginación, CI, RLS revisada.
 3. ~~**Fase 8 (fundamentos de datos)**~~ — ✅ completa: taxonomía de grupos musculares, flag de calentamiento, perfil persistente wireado a `generar-rutina`, granularidad de RPE.
 4. ~~**Fase 8 (features visibles)**~~ — ✅ mayormente completa: volumen por grupo muscular, sobrecarga progresiva real en generación de rutinas, insight post-entrenamiento con tendencia histórica, registro de peso corporal, sustitución de ejercicio en sesión. Quedan diferidos cues técnicos/contenido (no es trabajo de ingeniería) y mesociclos (el ítem más ambicioso, sin diseño concreto todavía).
-5. **Fase 5 (resto)** — ~~timer de descanso~~ y ~~"igual que la vez pasada"~~ ya hechos; falta botones rápidos (+2.5kg/-2.5kg/+1 rep), autoscroll al siguiente ejercicio, marcar ejercicio como completado, estado visual de progreso dentro de la rutina.
-6. **Fase 7** — PWA, al final.
+5. ~~**Fase 5**~~ — ✅ completa: copiar serie anterior, botones rápidos, timer de descanso, autoscroll, marcar completado, progreso visual de la rutina.
+6. **Fase 7** — PWA, al final. Único ítem funcional pendiente del roadmap además de los diferidos de Fase 8 (cues técnicos/contenido, mesociclos).
