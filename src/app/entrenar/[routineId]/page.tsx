@@ -727,6 +727,23 @@ export default function EntrenarPage() {
         </div>
       </section>
 
+      {routineExercises.length > 0 && (
+        <section className="mb-6">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="font-bold text-zinc-300">Progreso de la rutina</span>
+            <span className="text-zinc-500">
+              {completedExerciseIds.size}/{routineExercises.length} ejercicios
+            </span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-zinc-900">
+            <div
+              className="h-full rounded-full bg-[#CCFF00] transition-all"
+              style={{ width: `${Math.round((completedExerciseIds.size / routineExercises.length) * 100)}%` }}
+            />
+          </div>
+        </section>
+      )}
+
       <section className="mb-6 grid grid-cols-2 gap-3">
         <button
           onClick={iniciarEntrenamiento}
