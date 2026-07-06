@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, CalendarDays, Dumbbell, Loader2, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
+import { useSession } from "@/components/SessionProvider";
 
 const PAGE_SIZE = 20;
 
@@ -52,7 +52,7 @@ function getWorkoutDuration(startTime: string, endTime: string | null) {
 }
 
 export default function HistorialPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isLoading: isSessionLoading } = useSession();
   const [workouts, setWorkouts] = useState<WorkoutLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -92,17 +92,16 @@ export default function HistorialPage() {
   }
 
   useEffect(() => {
+    if (isSessionLoading) return;
+
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     async function loadHistory() {
       setIsLoading(true);
       setError(null);
-
-      const { data: authData } = await supabase.auth.getUser();
-      setUser(authData.user);
-
-      if (!authData.user) {
-        setIsLoading(false);
-        return;
-      }
 
       const page = await loadPage(0);
       setWorkouts(page);
@@ -110,7 +109,7 @@ export default function HistorialPage() {
     }
 
     void loadHistory();
-  }, []);
+  }, [user, isSessionLoading]);
 
   async function cargarMas() {
     setIsLoadingMore(true);

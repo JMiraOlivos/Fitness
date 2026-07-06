@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, Loader2, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { estimateOneRepMax } from "@/lib/oneRepMax";
+import { useSession } from "@/components/SessionProvider";
 
 const PAGE_SIZE = 50;
 
@@ -76,7 +76,7 @@ function buildTrend(logs: SetLog[]) {
 
 export default function ExerciseProgressDetailPage() {
   const params = useParams<{ exerciseId: string }>();
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isLoading: isSessionLoading } = useSession();
   const [logs, setLogs] = useState<SetLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -134,17 +134,16 @@ export default function ExerciseProgressDetailPage() {
   );
 
   useEffect(() => {
+    if (isSessionLoading) return;
+
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     async function loadExercise() {
       setIsLoading(true);
       setError(null);
-
-      const { data: authData } = await supabase.auth.getUser();
-      setUser(authData.user);
-
-      if (!authData.user) {
-        setIsLoading(false);
-        return;
-      }
 
       const page = await loadPage(0);
       setLogs(page);
@@ -152,7 +151,7 @@ export default function ExerciseProgressDetailPage() {
     }
 
     void loadExercise();
-  }, [params.exerciseId, loadPage]);
+  }, [user, isSessionLoading, loadPage]);
 
   async function cargarMas() {
     setIsLoadingMore(true);

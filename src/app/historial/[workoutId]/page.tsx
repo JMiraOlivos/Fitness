@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
+import { useSession } from "@/components/SessionProvider";
 
 type RoutineRef = { title: string; description: string | null };
 type ExerciseRef = { name: string; target_muscle: string; equipment: string };
@@ -39,7 +39,7 @@ function duration(startTime: string, endTime: string | null) {
 
 export default function WorkoutDetailPage() {
   const params = useParams<{ workoutId: string }>();
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isLoading: isSessionLoading } = useSession();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,15 +49,15 @@ export default function WorkoutDetailPage() {
   const totalVolume = volume(setLogs);
 
   useEffect(() => {
+    if (isSessionLoading) return;
+
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     async function load() {
       setIsLoading(true);
-      const { data: authData } = await supabase.auth.getUser();
-      setUser(authData.user);
-
-      if (!authData.user) {
-        setIsLoading(false);
-        return;
-      }
 
       const { data, error: loadError } = await supabase
         .from("workout_logs")
@@ -86,7 +86,7 @@ export default function WorkoutDetailPage() {
     }
 
     void load();
-  }, [params.workoutId]);
+  }, [params.workoutId, user, isSessionLoading]);
 
   if (isLoading) {
     return (

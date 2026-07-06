@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, Dumbbell, Loader2, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { estimateOneRepMax } from "@/lib/oneRepMax";
+import { useSession } from "@/components/SessionProvider";
 
 type ExerciseRef = {
   id: string;
@@ -91,7 +91,7 @@ function formatDate(value: string) {
 }
 
 export default function ProgresoPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isLoading: isSessionLoading } = useSession();
   const [setLogs, setSetLogs] = useState<SetLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,17 +102,16 @@ export default function ProgresoPage() {
   const topExercise = progress[0];
 
   useEffect(() => {
+    if (isSessionLoading) return;
+
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     async function loadProgress() {
       setIsLoading(true);
       setError(null);
-
-      const { data: authData } = await supabase.auth.getUser();
-      setUser(authData.user);
-
-      if (!authData.user) {
-        setIsLoading(false);
-        return;
-      }
 
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
@@ -140,7 +139,7 @@ export default function ProgresoPage() {
     }
 
     void loadProgress();
-  }, []);
+  }, [user, isSessionLoading]);
 
   return (
     <main className="min-h-screen bg-black text-white p-6 pb-16 font-sans max-w-md mx-auto">

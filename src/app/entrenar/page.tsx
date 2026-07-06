@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, Dumbbell, Loader2, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "@/components/SessionProvider";
 
 type RoutineListItem = {
   id: string;
@@ -15,23 +15,22 @@ type RoutineListItem = {
 };
 
 export default function EntrenarIndexPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isLoading: isSessionLoading } = useSession();
   const [routines, setRoutines] = useState<RoutineListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isSessionLoading) return;
+
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     async function load() {
       setIsLoading(true);
       setError(null);
-
-      const { data: authData } = await supabase.auth.getUser();
-      setUser(authData.user);
-
-      if (!authData.user) {
-        setIsLoading(false);
-        return;
-      }
 
       const { data, error: loadError } = await supabase
         .from("routines")
@@ -54,7 +53,7 @@ export default function EntrenarIndexPage() {
     }
 
     void load();
-  }, []);
+  }, [user, isSessionLoading]);
 
   return (
     <main className="min-h-screen bg-black text-white p-6 pb-16 font-sans max-w-md mx-auto">
@@ -78,7 +77,7 @@ export default function EntrenarIndexPage() {
       {!isLoading && !user && (
         <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5">
           <h2 className="text-xl font-black">Inicia sesión primero</h2>
-          <p className="text-sm text-zinc-400 mt-2">Vuelve al dashboard, inicia sesión con magic link y guarda una rutina antes de entrenar.</p>
+          <p className="text-sm text-zinc-400 mt-2">Vuelve al dashboard, inicia sesión y guarda una rutina antes de entrenar.</p>
           <Link href="/" className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-[#CCFF00] px-4 py-3 font-black text-black">
             Ir al dashboard
           </Link>

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { BrainCircuit, CheckCircle2, Dumbbell, History, Loader2, LogOut, Play, Save, Sparkles, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
+import { useSession } from "@/components/SessionProvider";
 
 type EjercicioIA = {
   nombre: string;
@@ -137,7 +137,7 @@ export default function Dashboard() {
   const [rutinasIA, setRutinasIA] = useState<RutinaIA[]>([]);
   const [rutinasGuardadas, setRutinasGuardadas] = useState<RutinaGuardada[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics>(initialMetrics);
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isLoading: isSessionLoading } = useSession();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
@@ -146,31 +146,19 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-      if (data.user) {
-        void cargarRutinasGuardadas();
-        void cargarMetricasDashboard();
-      }
-    });
+    if (isSessionLoading) return;
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        void cargarRutinasGuardadas();
-        void cargarMetricasDashboard();
-      } else {
-        setRutinasGuardadas([]);
-        setMetrics(initialMetrics);
-      }
-    });
-
-    return () => subscription.subscription.unsubscribe();
-  }, []);
+    if (user) {
+      void cargarRutinasGuardadas();
+      void cargarMetricasDashboard();
+    } else {
+      setRutinasGuardadas([]);
+      setMetrics(initialMetrics);
+    }
+  }, [user, isSessionLoading]);
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
-    setUser(null);
     setRutinasGuardadas([]);
     setMetrics(initialMetrics);
   }

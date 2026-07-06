@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, CheckCircle2, Dumbbell, Loader2, Play, Plus, Sparkles, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
+import { useSession } from "@/components/SessionProvider";
 
 type ExerciseRow = {
   id: string;
@@ -131,7 +131,7 @@ export default function EntrenarPage() {
   const router = useRouter();
   const routineId = params.routineId;
 
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isLoading: isSessionLoading } = useSession();
   const [routine, setRoutine] = useState<RoutineRow | null>(null);
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -150,17 +150,18 @@ export default function EntrenarPage() {
   }, [routine]);
 
   useEffect(() => {
+    if (isSessionLoading) return;
+
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
+    const userId = user.id;
+
     async function bootstrap() {
       setIsLoading(true);
       setError(null);
-
-      const { data: authData } = await supabase.auth.getUser();
-      setUser(authData.user);
-
-      if (!authData.user) {
-        setIsLoading(false);
-        return;
-      }
 
       const { data, error: routineError } = await supabase
         .from("routines")
@@ -199,7 +200,7 @@ export default function EntrenarPage() {
         .filter((id): id is string => Boolean(id));
 
       if (exerciseIds.length > 0) {
-        await cargarSugerencias(authData.user.id, exerciseIds);
+        await cargarSugerencias(userId, exerciseIds);
       }
 
       setIsLoading(false);
@@ -244,7 +245,7 @@ export default function EntrenarPage() {
     }
 
     void bootstrap();
-  }, [routineId]);
+  }, [routineId, user, isSessionLoading]);
 
   function updateInput(routineExerciseId: string, patch: Partial<SetInput>) {
     setInputs((current) => ({

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AppNavigation } from "@/components/AppNavigation";
+import { SessionProvider } from "@/components/SessionProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,8 +20,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body className="bg-black antialiased">
-        {children}
-        <AppNavigation />
+        <SessionProvider>
+          {children}
+          <AppNavigation />
+        </SessionProvider>
       </body>
     </html>
   );
