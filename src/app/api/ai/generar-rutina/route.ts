@@ -45,10 +45,7 @@ export async function POST(req: Request) {
       model: google('gemini-2.5-flash'),
       system: `Eres un entrenador personal experto y científico del deporte.
       Tu tarea es diseñar una rutina de entrenamiento personalizada basada en las restricciones del usuario.
-      IMPORTANTE: Sigue estrictamente las preferencias históricas del usuario:
-      - NO incluyas pullups, dominadas ni variantes libres de colgarse. Usa solo jalón al pecho o remo en máquina.
-      - NO incluyas sentadillas búlgaras.
-      - Para el tren superior (upper), prioriza ejercicios con poleas, press de banca libre y press de hombros en máquina.`,
+      IMPORTANTE: Sigue estrictamente las restricciones o lesiones que el usuario indique en su solicitud.`,
       prompt: `Genera una rutina de entrenamiento con las siguientes especificaciones actuales:
       - Días disponibles esta semana: ${diasDisponibles}
       - Enfoque del entrenamiento: ${enfoque}
