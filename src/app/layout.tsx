@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { AppNavigation } from "@/components/AppNavigation";
 import { SessionProvider } from "@/components/SessionProvider";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ServiceWorkerRegistration />
         <SessionProvider>
           {children}
+          <InstallPrompt />
           <AppNavigation />
         </SessionProvider>
       </body>
