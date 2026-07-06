@@ -189,19 +189,19 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 
 ---
 
-## Fase 7 - PWA y distribución
+## Fase 7 - PWA y distribución ✅
 
 **Objetivo:** que se sienta como app móvil instalable.
 
 ### Alcance funcional
 
-- Iconos completos.
-- Service worker.
-- Modo offline básico.
-- Cache de rutinas guardadas.
-- Mejor experiencia de instalación.
+- ✅ Iconos completos: set completo (favicon, 192/512, apple-touch, maskable) generado a partir de `icon.svg`/`icon-maskable.svg` y wireado en `manifest.json` y `metadata.icons`/`appleWebApp` de `layout.tsx`.
+- ✅ Service worker: `public/sw.js` hecho a mano (sin Workbox/next-pwa, dado que los assets de Next.js están hasheados por build y no hay manifest fijo que precachear) — cachea el app shell en `install` y usa `network-first` para navegaciones y `stale-while-revalidate` para `/_next/static/*` en runtime. Registrado desde `ServiceWorkerRegistration`.
+- ✅ Modo offline básico: fallback estático `public/offline.html` (sin JS ni build hash propio, a diferencia de una página real de Next.js) servido cuando una navegación falla sin red.
+- ✅ Cache de rutinas guardadas: el GET a `/rest/v1/routines` se cachea con la misma estrategia `network-first` (`isRoutinesApiRequest` en `sw.js`), para que el listado de rutinas guardadas del dashboard siga disponible offline.
+- ✅ Mejor experiencia de instalación: `InstallPrompt` captura `beforeinstallprompt` en Android/Chrome y muestra un banner propio con botón "Instalar"; en iOS Safari (que nunca dispara ese evento) muestra instrucciones manuales de "Agregar a inicio". El dismiss se recuerda en `localStorage`.
 
-> Diferir hasta que las Fases 0, 6 y 8 estén sustancialmente resueltas: pulir la instalabilidad de una app a la que aún le falta timer de descanso y volumen por grupo muscular es de menor apalancamiento.
+> Nota de verificación: el cacheo del GET de rutinas no se pudo probar contra el proyecto de Supabase real (el sandbox de desarrollo bloquea el egress a `supabase.co`), pero reutiliza el helper `networkFirst` ya validado con el resto de navegaciones y un predicado de URL simple y directamente verificable.
 
 ---
 
@@ -222,4 +222,6 @@ Los ejercicios globales (`owner_id is null`, ver Fase 6) se crean solo a través
 3. ~~**Fase 8 (fundamentos de datos)**~~ — ✅ completa: taxonomía de grupos musculares, flag de calentamiento, perfil persistente wireado a `generar-rutina`, granularidad de RPE.
 4. ~~**Fase 8 (features visibles)**~~ — ✅ mayormente completa: volumen por grupo muscular, sobrecarga progresiva real en generación de rutinas, insight post-entrenamiento con tendencia histórica, registro de peso corporal, sustitución de ejercicio en sesión. Quedan diferidos cues técnicos/contenido (no es trabajo de ingeniería) y mesociclos (el ítem más ambicioso, sin diseño concreto todavía).
 5. ~~**Fase 5**~~ — ✅ completa: copiar serie anterior, botones rápidos, timer de descanso, autoscroll, marcar completado, progreso visual de la rutina.
-6. **Fase 7** — PWA, al final. Único ítem funcional pendiente del roadmap además de los diferidos de Fase 8 (cues técnicos/contenido, mesociclos).
+6. ~~**Fase 7**~~ — ✅ completa: iconos, service worker, modo offline, cache de rutinas guardadas, prompt de instalación propio.
+
+No quedan fases funcionales pendientes en el roadmap. Los únicos ítems abiertos son los diferidos explícitamente de Fase 8: cues técnicos/contenido (esfuerzo de contenido, no de ingeniería) y mesociclos (sin diseño concreto todavía).
