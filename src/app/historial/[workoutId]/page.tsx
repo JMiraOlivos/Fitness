@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { one } from "@/lib/supabaseJoins";
 
 type RoutineRef = { title: string; description: string | null };
 type ExerciseRef = { name: string; target_muscle: string; equipment: string };
@@ -25,10 +26,6 @@ type Workout = {
   routines?: RoutineRef | RoutineRef[] | null;
   set_logs?: SetLog[];
 };
-
-function one<T>(value: T | T[] | null | undefined) {
-  return Array.isArray(value) ? value[0] ?? null : value ?? null;
-}
 
 function volume(logs: Array<{ weight: number; reps: number }>) {
   return logs.reduce((sum, log) => sum + Number(log.weight || 0) * Number(log.reps || 0), 0);

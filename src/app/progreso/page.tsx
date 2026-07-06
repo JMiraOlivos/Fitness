@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, Dumbbell, Loader2, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { one } from "@/lib/supabaseJoins";
+import { estimateOneRepMax } from "@/lib/oneRepMax";
 
 type ExerciseRef = {
   id: string;
@@ -35,18 +37,9 @@ type ExerciseProgress = {
   volume: number;
   maxWeight: number;
   maxReps: number;
-  estimatedOneRepMax: number;
+  estimatedOneRepMax: number | null;
   lastDate: string;
 };
-
-function one<T>(value: T | T[] | null | undefined) {
-  return Array.isArray(value) ? value[0] ?? null : value ?? null;
-}
-
-function estimateOneRepMax(weight: number, reps: number) {
-  if (!weight || !reps) return 0;
-  return weight * (1 + reps / 30);
-}
 
 function buildProgress(setLogs: SetLog[]) {
   const map = new Map<string, ExerciseProgress>();
@@ -66,7 +59,7 @@ function buildProgress(setLogs: SetLog[]) {
       volume: 0,
       maxWeight: 0,
       maxReps: 0,
-      estimatedOneRepMax: 0,
+      estimatedOneRepMax: null,
       lastDate: workout?.start_time || "",
     };
 
@@ -78,7 +71,9 @@ function buildProgress(setLogs: SetLog[]) {
     current.volume += weight * reps;
     current.maxWeight = Math.max(current.maxWeight, weight);
     current.maxReps = Math.max(current.maxReps, reps);
-    current.estimatedOneRepMax = Math.max(current.estimatedOneRepMax, oneRepMax);
+    if (oneRepMax !== null) {
+      current.estimatedOneRepMax = Math.max(current.estimatedOneRepMax ?? 0, oneRepMax);
+    }
 
     if (workout?.start_time && (!current.lastDate || new Date(workout.start_time) > new Date(current.lastDate))) {
       current.lastDate = workout.start_time;
@@ -243,7 +238,9 @@ export default function ProgresoPage() {
                 </div>
                 <div className="rounded-2xl bg-zinc-900 p-3">
                   <p className="text-[10px] text-zinc-500 uppercase font-bold">1RM est.</p>
-                  <p className="font-black mt-1">{Math.round(item.estimatedOneRepMax)} kg</p>
+                  <p className="font-black mt-1">
+                    {item.estimatedOneRepMax !== null ? `${Math.round(item.estimatedOneRepMax)} kg` : "No disponible"}
+                  </p>
                 </div>
               </div>
 

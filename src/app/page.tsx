@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { BrainCircuit, CheckCircle2, Dumbbell, History, Loader2, LogOut, Play, Save, Sparkles, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { one } from "@/lib/supabaseJoins";
 
 type EjercicioIA = {
   nombre: string;
@@ -82,10 +83,6 @@ const initialMetrics: DashboardMetrics = {
   currentStreak: 0,
   lastWorkoutLabel: "Sin registros",
 };
-
-function getJoinedExercise(exercises: RutinaExerciseGuardada["exercises"]) {
-  return Array.isArray(exercises) ? exercises[0] ?? null : exercises ?? null;
-}
 
 function normalizeExerciseText(value: string) {
   return value.trim().replace(/\s+/g, " ");
@@ -504,7 +501,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-4 grid gap-2">
                 {(rutina.routine_exercises || []).slice(0, 5).map((item, index) => {
-                  const exercise = getJoinedExercise(item.exercises);
+                  const exercise = one(item.exercises);
                   return (
                     <div key={`${rutina.id}-${index}`} className="flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2 text-xs">
                       <span className="text-zinc-300">{exercise?.name || "Ejercicio"}</span>

@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, Loader2, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { one } from "@/lib/supabaseJoins";
+import { estimateOneRepMax } from "@/lib/oneRepMax";
 
 type ExerciseRef = { id: string; name: string; target_muscle: string; equipment: string };
 type WorkoutRef = { start_time: string };
@@ -27,17 +29,8 @@ type TrendPoint = {
   sets: number;
 };
 
-function one<T>(value: T | T[] | null | undefined) {
-  return Array.isArray(value) ? value[0] ?? null : value ?? null;
-}
-
 function volume(logs: SetLog[]) {
   return logs.reduce((sum, log) => sum + Number(log.weight || 0) * Number(log.reps || 0), 0);
-}
-
-function estimatedOneRepMax(weight: number, reps: number) {
-  if (!weight || !reps) return 0;
-  return weight * (1 + reps / 30);
 }
 
 function dateLabel(value?: string) {
@@ -98,7 +91,11 @@ export default function ExerciseProgressDetailPage() {
   const totalVolume = useMemo(() => volume(logs), [logs]);
   const maxWeight = useMemo(() => logs.reduce((max, log) => Math.max(max, Number(log.weight || 0)), 0), [logs]);
   const bestOneRepMax = useMemo(() => {
-    return logs.reduce((max, log) => Math.max(max, estimatedOneRepMax(Number(log.weight || 0), Number(log.reps || 0))), 0);
+    return logs.reduce((max: number | null, log) => {
+      const oneRepMax = estimateOneRepMax(Number(log.weight || 0), Number(log.reps || 0));
+      if (oneRepMax === null) return max;
+      return max === null ? oneRepMax : Math.max(max, oneRepMax);
+    }, null);
   }, [logs]);
   const trend = useMemo(() => buildTrend(logs), [logs]);
   const maxTrendVolume = useMemo(() => Math.max(...trend.map((point) => point.volume), 1), [trend]);
@@ -189,7 +186,9 @@ export default function ExerciseProgressDetailPage() {
             </div>
             <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
               <p className="text-[10px] text-zinc-500 uppercase font-bold">1RM</p>
-              <p className="text-xl font-black mt-1">{Math.round(bestOneRepMax)}</p>
+              <p className="text-xl font-black mt-1">
+                {bestOneRepMax !== null ? Math.round(bestOneRepMax) : "N/D"}
+              </p>
             </div>
           </section>
 

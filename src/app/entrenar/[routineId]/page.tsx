@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, CheckCircle2, Dumbbell, Loader2, Play, Plus, Square } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { one } from "@/lib/supabaseJoins";
 
 type ExerciseRow = {
   id: string;
@@ -51,14 +52,6 @@ type WorkoutInsightResponse = {
   score?: number;
   error?: string;
 };
-
-function getJoinedExercise(exercises: RoutineExerciseRow["exercises"]) {
-  if (Array.isArray(exercises)) {
-    return exercises[0] ?? null;
-  }
-
-  return exercises ?? null;
-}
 
 function defaultInput(): SetInput {
   return {
@@ -217,7 +210,7 @@ export default function EntrenarPage() {
     setIsSavingSet(true);
 
     try {
-      const exercise = getJoinedExercise(item.exercises);
+      const exercise = one(item.exercises);
 
       if (!exercise?.id) {
         throw new Error("El ejercicio no tiene ID asociado.");
@@ -297,7 +290,7 @@ export default function EntrenarPage() {
 
     const exerciseSummaries = routineExercises
       .map((item) => {
-        const exercise = getJoinedExercise(item.exercises);
+        const exercise = one(item.exercises);
         const logs = exercise?.id ? setLogs[exercise.id] || [] : [];
 
         return {
@@ -490,7 +483,7 @@ export default function EntrenarPage() {
 
       <section className="grid gap-4">
         {routineExercises.map((item) => {
-          const exercise = getJoinedExercise(item.exercises);
+          const exercise = one(item.exercises);
           const currentInput = inputs[item.id] || defaultInput();
           const localLogs = exercise?.id ? setLogs[exercise.id] || [] : [];
 
