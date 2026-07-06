@@ -2,7 +2,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from '@/lib/exerciseTaxonomy';
-import { getOptionalUserProfile } from '@/lib/supabaseServer';
+import { getOptionalUserProfile, getRecentPerformanceSummary, resolveOptionalAuth } from '@/lib/supabaseServer';
 
 export const runtime = 'edge';
 
@@ -44,8 +44,10 @@ export async function POST(req: Request) {
     const google = createGoogleGenerativeAI({ apiKey });
 
     // Best-effort: an anonymous or invalid-token caller still gets a routine generated
-    // exactly as before, just without profile personalization.
-    const profile = await getOptionalUserProfile(req);
+    // exactly as before, just without profile/history personalization.
+    const auth = await resolveOptionalAuth(req);
+    const profile = await getOptionalUserProfile(auth);
+    const recentPerformance = await getRecentPerformanceSummary(auth);
 
     const restriccionesCompletas = profile?.injury_notes
       ? `${restricciones}. Restricciones persistentes del perfil del usuario (siempre aplican, aunque no se repitan arriba): ${profile.injury_notes}`
@@ -61,15 +63,29 @@ export async function POST(req: Request) {
           .join('\n      ')
       : '';
 
+    const historialContext =
+      recentPerformance.length > 0
+        ? `\n      Historial reciente de desempeño real del usuario (usa esto para aplicar sobrecarga progresiva: si el RPE fue bajo, sugiere subir peso o reps para ese ejercicio si lo repites; si fue alto, mantén o baja la carga):\n      ${recentPerformance
+            .map(
+              (item) =>
+                `- ${item.exerciseName} (${item.targetMuscle}): ${item.weight}kg x ${item.reps} reps${
+                  item.rpe !== null ? `, RPE ${item.rpe}` : ''
+                }, hace ${item.daysAgo} día(s)`
+            )
+            .join('\n      ')}`
+        : '';
+
     const result = await generateObject({
       model: google('gemini-2.5-flash'),
       system: `Eres un entrenador personal experto y científico del deporte.
       Tu tarea es diseñar una rutina de entrenamiento personalizada basada en las restricciones del usuario.
-      IMPORTANTE: Sigue estrictamente las restricciones o lesiones que el usuario indique en su solicitud.`,
+      IMPORTANTE: Sigue estrictamente las restricciones o lesiones que el usuario indique en su solicitud.
+      Si recibes el historial reciente de desempeño del usuario, aplica principios reales de sobrecarga progresiva
+      en vez de generar pesos/reps genéricos.`,
       prompt: `Genera una rutina de entrenamiento con las siguientes especificaciones actuales:
       - Días disponibles esta semana: ${diasDisponibles}
       - Enfoque del entrenamiento: ${enfoque}
-      - Restricciones o lesiones actuales: ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ''}`,
+      - Restricciones o lesiones actuales: ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ''}${historialContext}`,
       schema: rutinaSchema,
     });
 
