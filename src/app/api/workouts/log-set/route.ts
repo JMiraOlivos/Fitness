@@ -23,8 +23,12 @@ export async function POST(req: Request) {
     return Response.json({ error: "Ingresa repeticiones válidas." }, { status: 400 });
   }
 
-  if (rpe !== null && rpe !== undefined && (typeof rpe !== "number" || rpe < 1 || rpe > 10)) {
-    return Response.json({ error: "El RPE debe estar entre 1 y 10." }, { status: 400 });
+  if (
+    rpe !== null &&
+    rpe !== undefined &&
+    (typeof rpe !== "number" || rpe < 1 || rpe > 10 || Math.round(rpe * 2) !== rpe * 2)
+  ) {
+    return Response.json({ error: "El RPE debe estar entre 1 y 10, en incrementos de 0.5." }, { status: 400 });
   }
 
   const { data, error } = await auth.supabase

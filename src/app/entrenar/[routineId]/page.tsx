@@ -331,7 +331,7 @@ export default function EntrenarPage() {
       const currentInput = inputs[item.id] || defaultInput();
       const weight = Number(currentInput.weight);
       const reps = Number.parseInt(currentInput.reps, 10);
-      const rpe = currentInput.rpe ? Number.parseInt(currentInput.rpe, 10) : null;
+      const rpe = currentInput.rpe ? Number.parseFloat(currentInput.rpe) : null;
       const isWarmup = currentInput.isWarmup;
 
       if (!Number.isFinite(weight) || weight < 0) {
@@ -342,8 +342,8 @@ export default function EntrenarPage() {
         throw new Error("Ingresa repeticiones válidas.");
       }
 
-      if (rpe !== null && (!Number.isFinite(rpe) || rpe < 1 || rpe > 10)) {
-        throw new Error("El RPE debe estar entre 1 y 10.");
+      if (rpe !== null && (!Number.isFinite(rpe) || rpe < 1 || rpe > 10 || Math.round(rpe * 2) !== rpe * 2)) {
+        throw new Error("El RPE debe estar entre 1 y 10, en incrementos de 0.5.");
       }
 
       const logId = await ensureWorkoutLog();
@@ -671,8 +671,8 @@ export default function EntrenarPage() {
                   <input
                     value={currentInput.rpe}
                     onChange={(event) => updateInput(item.id, { rpe: event.target.value })}
-                    inputMode="numeric"
-                    placeholder="8"
+                    inputMode="decimal"
+                    placeholder="8 o 8.5"
                     className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-3 text-white outline-none focus:border-[#CCFF00]"
                   />
                 </label>
