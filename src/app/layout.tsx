@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { ProgressFloatingButton } from "@/components/ProgressFloatingButton";
+import { AppNavigation } from "@/components/AppNavigation";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body className="bg-black antialiased">
         {children}
-        <ProgressFloatingButton />
+        <AppNavigation />
       </body>
     </html>
   );
