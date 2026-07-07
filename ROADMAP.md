@@ -347,13 +347,24 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 
 ⬜ Pendiente — coincide con lo que este roadmap ya marca como diferido en Fase 8 ("esfuerzo de contenido, no de ingeniería"). Sin cambios: sigue siendo baja prioridad hasta tener una fuente de contenido curado confiable.
 
-## Fase vNext 14 — Offline real con sincronización
+## Fase vNext 14 — Offline real con sincronización ✅ (completa, 2026-07-07)
 
-🟡 Parcial. Ya cubierto (Fase 7): service worker con app-shell caching, `network-first` para navegaciones, `stale-while-revalidate` para assets, cache del GET de rutinas guardadas, fallback offline estático. **Falta** todo lo que requiere escritura offline: cola local (IndexedDB) para registrar series sin conexión, sync automático al reconectar, resolución de conflictos e indicador de estado "pendiente de sincronizar" — hoy la app cachea lectura pero no soporta registrar series sin red.
+- ✅ IndexedDB con `idb` (`src/lib/offline/db.ts`) como cola de operaciones pendientes (start/log-sets/finish/substitute/readiness).
+- ✅ `src/lib/offline/queue.ts`: encolado de operaciones con UUID, soporte offline para todas las mutaciones del workout.
+- ✅ `src/lib/offline/syncManager.ts`: procesa la cola al reconectar (evento `online`), mapea temp→real IDs, reintentos con backoff.
+- ✅ `src/lib/offline/useConnectivity.ts`: hook React con `isOnline`, `pendingCount`, `isSyncing`.
+- ✅ API routes idempotentes vía `client_operation_id` (previene duplicados en reintentos de sync): migración `20260717_add_offline_idempotency.sql`.
+- ✅ UI optimista: series offline visibles al instante con badge ⏳, OfflineBanner, indicador de conectividad en nav.
+- ✅ `SyncInitializer` en layout raíz: procesa cola pendiente al montar la app.
 
-## Fase vNext 15 — Personalización avanzada
+## Fase vNext 15 — Personalización avanzada ✅ (completa, 2026-07-07)
 
-⬜ Pendiente, no existe. No hay tabla `user_exercise_preferences` ni señal de favoritos/ejercicios evitados. Se solapa con Fase vNext 4 (requiere que exista `is_verified`/matching de catálogo para que "sustituye con frecuencia" tenga sentido agregado). Baja prioridad hasta que la Fase vNext 1-2 den suficiente prescripción/progresión real que aprender a preferir.
+- ✅ Migración `20260718_add_user_exercise_preferences.sql`: tabla `user_exercise_preferences` con RLS (favorito/evitado/times_used/last_used_at).
+- ✅ API `POST /api/exercises/preferences` para upsert de preferencias.
+- ✅ UI: estrella ⭐ favorito en ExerciseCard (fill #CCFF00 si activo), botón "Evitar" en acciones, badge rojo si ejercicio está evitado.
+- ✅ SubstitutionPanel: favoritos ordenados primero con estrella.
+- ✅ AI: `generar-rutina` y `regenerar-dia` reciben listas de favoritos ("prefiérelos") y evitados ("NUNCA los incluyas") en el prompt.
+- ✅ `getUserExercisePreferences()` en supabaseServer con join a exercises para nombres.
 
 ## Fase vNext 16 — Cardio, movilidad y salud general
 
@@ -396,7 +407,7 @@ Con esto queda cerrado el bloque P1 completo del roadmap vNext.
 **P2 — después**
 
 1. ~~**vNext 4 (resto) — Aliases, verificación y `/admin/exercises`.**~~ — ✅ completa (2026-07-07): migraciones de curación + matching de aliases, `profiles.is_admin`, pantalla `/admin/exercises`.
-2. **vNext 14 (resto) — Cola offline + sync de series.**
-3. **vNext 15 — Personalización avanzada.**
+2. ~~**vNext 14 (resto) — Cola offline + sync de series.**~~ — ✅ completa (2026-07-07): IndexedDB + sync automático + idempotencia API + UI optimista.
+3. ~~**vNext 15 — Personalización avanzada.**~~ — ✅ completa (2026-07-07): favoritos/evitados + UI estrella + wireado a prompts de IA.
 4. **vNext 17 — Coach IA proactivo.**
 5. **vNext 13, 16, 18 — Contenido técnico, cardio/movilidad, admin.** Sin cambios respecto al análisis original: baja urgencia.
