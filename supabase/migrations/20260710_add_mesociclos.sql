@@ -92,6 +92,7 @@ where program_id is not null;
 -- (mismo motivo por el que 20260709_regenerate_routine_day_rpc.sql hizo un drop
 -- explícito antes de recrear con una firma distinta).
 drop function if exists public.save_routine_with_exercises(text, text, jsonb);
+drop function if exists public.save_routine_with_exercises(text, text, jsonb, uuid, integer, integer);
 
 create function public.save_routine_with_exercises(
   routine_title text,
