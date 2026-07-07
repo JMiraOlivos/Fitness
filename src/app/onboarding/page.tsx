@@ -118,8 +118,8 @@ export default function OnboardingPage() {
     setIsGenerating(true);
 
     try {
-      const rutinas = await generateRoutine({
-        diasDisponibles: Number(diasDisponibles) || 4,
+      const { rutinas } = await generateRoutine({
+        diasDisponibles: Number(diasDisponibles),
         enfoque: trainingGoal || "Hipertrofia",
         restricciones: injuryNotes || "Sin restricciones",
       });

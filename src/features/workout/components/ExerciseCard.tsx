@@ -2,6 +2,7 @@ import { CheckCircle, Clock, Dumbbell, Repeat, Sparkles, Star } from "lucide-rea
 import { formatRelativeDate, formatRestTime, PRIORITY_LABELS } from "../domain/workoutMetrics";
 import { SetLogger } from "./SetLogger";
 import { SubstitutionPanel } from "./SubstitutionPanel";
+import { prLabel, type PersonalRecord } from "@/lib/training/pr";
 import type { ExerciseRow, ExerciseSuggestion, LocalSetLog, RoutineExerciseRow, SetInput } from "../types";
 
 type ExerciseCardProps = {
@@ -33,6 +34,8 @@ type ExerciseCardProps = {
   onToggleFavorite: () => void;
   onToggleAvoided: () => void;
   favoriteExerciseIds: Set<string>;
+  recentPRs?: PersonalRecord[];
+  onDismissPR?: () => void;
 };
 
 export function ExerciseCard({
@@ -64,6 +67,8 @@ export function ExerciseCard({
   onToggleFavorite,
   onToggleAvoided,
   favoriteExerciseIds,
+  recentPRs,
+  onDismissPR,
 }: ExerciseCardProps) {
   const prescriptionSummary = [
     item.target_rpe ? `RPE ${item.target_rpe}` : null,
@@ -101,6 +106,22 @@ export function ExerciseCard({
           </p>
           {isOptionalToday && <p className="mt-1 text-[10px] font-bold uppercase text-amber-300">Opcional hoy · poco tiempo</p>}
           {isAvoided && <p className="mt-1 text-[10px] font-bold uppercase text-red-400">Evitado · usa Sustituir</p>}
+
+          {recentPRs && recentPRs.length > 0 && (
+            <div className="mt-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-2 flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-bold uppercase text-amber-300 inline-flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Récord Personal
+                </p>
+                {recentPRs.map((pr) => (
+                  <p key={pr.metric} className="mt-0.5 text-xs font-bold text-amber-200">{prLabel(pr)}</p>
+                ))}
+              </div>
+              {onDismissPR && (
+                <button type="button" onClick={onDismissPR} className="shrink-0 text-[10px] font-bold text-zinc-500">X</button>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <button type="button" onClick={onToggleCompleted} className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-400">

@@ -17,10 +17,11 @@ export type LogAiGenerationParams = {
 };
 
 // Best-effort: a failed log write must never break the AI route it's observing.
-export async function logAiGeneration(params: LogAiGenerationParams) {
-  if (!params.supabase || !params.userId) return;
+// Returns the inserted row ID so callers can wire it to the AI feedback component.
+export async function logAiGeneration(params: LogAiGenerationParams): Promise<string | null> {
+  if (!params.supabase || !params.userId) return null;
 
-  const { error } = await params.supabase.from("ai_generations").insert({
+  const { data, error } = await params.supabase.from("ai_generations").insert({
     user_id: params.userId,
     type: params.type,
     model: AI_MODEL,
@@ -31,9 +32,12 @@ export async function logAiGeneration(params: LogAiGenerationParams) {
     latency_ms: Math.round(params.latencyMs),
     success: params.success,
     error: params.error ?? null,
-  });
+  }).select("id").single();
 
   if (error) {
     console.error("No se pudo registrar la generación de IA:", error.message);
+    return null;
   }
+
+  return (data as { id: string } | null)?.id ?? null;
 }

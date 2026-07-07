@@ -10,6 +10,7 @@ import { QuickActions } from "@/features/dashboard/components/QuickActions";
 import { CoachCard } from "@/features/dashboard/components/CoachCard";
 import { CoachGenerator } from "@/features/dashboard/components/CoachGenerator";
 import { SavedRoutines } from "@/features/dashboard/components/SavedRoutines";
+import { AiFeedback } from "@/components/AiFeedback";
 
 export default function Dashboard() {
   const dashboard = useDashboard();
@@ -71,6 +72,7 @@ export default function Dashboard() {
         isSaving={dashboard.isSaving}
         canSave={Boolean(dashboard.user)}
         onSave={(rutina) => void dashboard.guardarRutina(rutina)}
+        generationId={dashboard.lastGenerationId}
       />
     </main>
   );

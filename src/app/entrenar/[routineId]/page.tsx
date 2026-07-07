@@ -242,6 +242,8 @@ export default function EntrenarPage() {
               onToggleFavorite={() => exercise?.id && session.toggleFavorite(exercise.id)}
               onToggleAvoided={() => exercise?.id && session.toggleAvoided(exercise.id)}
               favoriteExerciseIds={session.favoriteExerciseIds}
+              recentPRs={exercise?.id ? session.recentPRs[exercise.id] : undefined}
+              onDismissPR={() => exercise?.id && session.clearRecentPRs(exercise.id)}
             />
           );
         })}

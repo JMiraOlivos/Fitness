@@ -53,6 +53,7 @@ export type WorkoutInsightResponse = {
   focoProximoEntrenamiento?: string;
   alerta?: string;
   score?: number;
+  generationId?: string | null;
   error?: string;
 };
 

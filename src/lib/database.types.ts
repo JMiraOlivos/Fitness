@@ -460,6 +460,7 @@ export type Database = {
           latency_ms: number | null;
           success: boolean;
           error: string | null;
+          user_feedback: "thumbs_up" | "thumbs_down" | null;
           created_at: string;
         };
         Insert: {
@@ -474,6 +475,7 @@ export type Database = {
           latency_ms?: number | null;
           success?: boolean;
           error?: string | null;
+          user_feedback?: "thumbs_up" | "thumbs_down" | null;
           created_at?: string;
         };
         Update: {
@@ -488,6 +490,7 @@ export type Database = {
           latency_ms?: number | null;
           success?: boolean;
           error?: string | null;
+          user_feedback?: "thumbs_up" | "thumbs_down" | null;
           created_at?: string;
         };
         Relationships: [
@@ -534,6 +537,58 @@ export type Database = {
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      personal_records: {
+        Row: {
+          id: string;
+          user_id: string;
+          exercise_id: string;
+          metric_type: "weight" | "reps" | "volume" | "one_rep_max";
+          value: number;
+          workout_log_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          exercise_id: string;
+          metric_type: "weight" | "reps" | "volume" | "one_rep_max";
+          value: number;
+          workout_log_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          exercise_id?: string;
+          metric_type?: "weight" | "reps" | "volume" | "one_rep_max";
+          value?: number;
+          workout_log_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "personal_records_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "personal_records_exercise_id_fkey";
+            columns: ["exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercises";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "personal_records_workout_log_id_fkey";
+            columns: ["workout_log_id"];
+            isOneToOne: false;
+            referencedRelation: "workout_logs";
             referencedColumns: ["id"];
           },
         ];

@@ -10,6 +10,7 @@ import { useSession } from "@/components/SessionProvider";
 import { classifyVolume, MUSCLE_GROUP_VOLUME_TARGETS, type VolumeStatus } from "@/lib/training/volumeTargets";
 import { detectFatigue } from "@/lib/training/fatigue";
 import { buildWeeklyRecommendations } from "@/lib/training/weeklyRecommendation";
+import { TrainingCalendar } from "@/components/TrainingCalendar";
 
 type ExerciseRef = {
   id: string;
@@ -344,6 +345,8 @@ export default function ProgresoPage() {
       )}
 
       {error && <div className="rounded-2xl border border-red-900/60 bg-red-950/40 p-4 text-sm text-red-200">{error}</div>}
+
+      {user && !isLoading && <TrainingCalendar />}
 
       {user && !isLoading && weeklyRecommendations.length > 0 && (
         <section className="mb-8 rounded-3xl border border-[#CCFF00]/40 bg-[#CCFF00]/10 p-4">

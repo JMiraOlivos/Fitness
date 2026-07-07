@@ -52,7 +52,7 @@ export async function finishWorkout(workoutLogId: string, aiInsight: string) {
 }
 
 export async function regenerateDay(routineId: string, instrucciones: string) {
-  return authFetch("/api/ai/regenerar-dia", { routineId, instrucciones });
+  return authFetch<{ ok: boolean; generationId?: string }>("/api/ai/regenerar-dia", { routineId, instrucciones });
 }
 
 export async function saveExercisePreference(exerciseId: string, isFavorite?: boolean, isAvoided?: boolean) {

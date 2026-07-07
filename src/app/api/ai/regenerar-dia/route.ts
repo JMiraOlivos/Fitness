@@ -173,7 +173,7 @@ export async function POST(req: Request) {
       return Response.json({ error: regenerateError.message }, { status: 500 });
     }
 
-    await logAiGeneration({
+    const generationId = await logAiGeneration({
       supabase: auth.supabase,
       userId: auth.user.id,
       type: "routine_regeneration",
@@ -183,7 +183,7 @@ export async function POST(req: Request) {
       success: true,
     });
 
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, generationId });
   } catch (error) {
     console.error("Error regenerando el día con Gemini:", error);
 

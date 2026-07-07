@@ -32,6 +32,9 @@ import {
 } from "@/lib/offline/queue";
 import { useConnectivity } from "@/lib/offline/useConnectivity";
 import { generateCoachRecommendations } from "@/features/dashboard/data/dashboardMutations";
+import { detectPRs, type PersonalRecord, type HistoricalBests } from "@/lib/training/pr";
+import { estimateOneRepMax } from "@/lib/oneRepMax";
+import { supabase } from "@/lib/supabase";
 import type {
   ExercisePriority,
   ExerciseRow,
@@ -78,6 +81,8 @@ export function useWorkoutSession(routineId: string) {
   const [pendingSetIds, setPendingSetIds] = useState<Set<string>>(new Set());
   const [favoriteExerciseIds, setFavoriteExerciseIds] = useState<Set<string>>(new Set());
   const [avoidedExerciseIds, setAvoidedExerciseIds] = useState<Set<string>>(new Set());
+  const [recentPRs, setRecentPRs] = useState<Record<string, PersonalRecord[]>>({});
+  const historicalBestsRef = useRef<Record<string, HistoricalBests>>({});
 
   useEffect(() => {
     if (restSecondsLeft === null || restSecondsLeft <= 0) return;
@@ -141,6 +146,22 @@ export function useWorkoutSession(routineId: string) {
       }
 
       setSuggestions(nextSuggestions);
+
+      // Compute historical bests for PR detection
+      const bests: Record<string, HistoricalBests> = {};
+      for (const row of historyRows) {
+        if (row.is_warmup) continue;
+        const current = bests[row.exercise_id] || { maxWeight: 0, maxReps: 0, maxVolume: 0, maxOneRepMax: null };
+        current.maxWeight = Math.max(current.maxWeight, Number(row.weight));
+        current.maxReps = Math.max(current.maxReps, Number(row.reps));
+        current.maxVolume += Number(row.weight) * Number(row.reps);
+        const oneRm = estimateOneRepMax(Number(row.weight), Number(row.reps));
+        if (oneRm !== null && (current.maxOneRepMax === null || oneRm > current.maxOneRepMax)) {
+          current.maxOneRepMax = oneRm;
+        }
+        bests[row.exercise_id] = current;
+      }
+      historicalBestsRef.current = bests;
     },
     []
   );
@@ -548,6 +569,27 @@ export function useWorkoutSession(routineId: string) {
         },
       }));
 
+      // PR detection (non-warmup sets only)
+      if (!isWarmup) {
+        const allLogs = [...(setLogs[exercise.id] || []), savedSet].filter((log) => !log.is_warmup);
+        const sessionVolume = allLogs.reduce((sum, log) => sum + log.weight * log.reps, 0);
+        const detected = detectPRs(exercise.id, weight, reps, sessionVolume, historicalBestsRef.current);
+        if (detected.length > 0) {
+          setRecentPRs((current) => ({ ...current, [exercise.id]: detected }));
+          // Update historical bests in-memory for subsequent sets in this session
+          const b = historicalBestsRef.current[exercise.id];
+          if (b) {
+            b.maxWeight = Math.max(b.maxWeight, weight);
+            b.maxReps = Math.max(b.maxReps, reps);
+            b.maxVolume = Math.max(b.maxVolume, sessionVolume);
+            const oneRm = estimateOneRepMax(weight, reps);
+            if (oneRm !== null && (b.maxOneRepMax === null || oneRm > b.maxOneRepMax)) {
+              b.maxOneRepMax = oneRm;
+            }
+          }
+        }
+      }
+
       setSuccessMessage(`Serie ${setNumber} registrada para ${exercise.name}${wasOffline ? " (sin conexión)" : ""}.`);
       setRestSecondsLeft(REST_DURATION_SECONDS);
     } catch (err) {
@@ -645,6 +687,22 @@ export function useWorkoutSession(routineId: string) {
       enqueueFinishWorkout(workoutLogId, aiInsight);
     }
 
+    // Persist personal records (best-effort, non-blocking)
+    if (isRealWorkoutLog) {
+      const prEntries = Object.entries(recentPRs).flatMap(([exerciseId, prs]) =>
+        prs.map((pr) => ({
+          user_id: user!.id,
+          exercise_id: exerciseId,
+          metric_type: pr.metric,
+          value: pr.value,
+          workout_log_id: workoutLogId,
+        }))
+      );
+      if (prEntries.length > 0) {
+        void supabase.from("personal_records").insert(prEntries);
+      }
+    }
+
     setIsFinishing(false);
 
     if (isRealWorkoutLog) {
@@ -711,6 +769,12 @@ export function useWorkoutSession(routineId: string) {
     avoidedExerciseIds,
     toggleFavorite,
     toggleAvoided,
+    recentPRs,
+    clearRecentPRs: (exerciseId: string) => setRecentPRs((current) => {
+      const next = { ...current };
+      delete next[exerciseId];
+      return next;
+    }),
   };
 }
 

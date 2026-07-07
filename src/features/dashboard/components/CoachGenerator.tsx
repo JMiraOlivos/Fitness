@@ -1,4 +1,5 @@
 import { BrainCircuit, CheckCircle2, Loader2, Save, Sparkles } from "lucide-react";
+import { AiFeedback } from "@/components/AiFeedback";
 import type { EjercicioIA, RutinaIA } from "../types";
 
 function ExercisePreview({ ejercicios }: { ejercicios: EjercicioIA[] }) {
@@ -40,6 +41,7 @@ type CoachGeneratorProps = {
   isSaving: boolean;
   canSave: boolean;
   onSave: (rutina: RutinaIA) => void;
+  generationId?: string | null;
 };
 
 export function CoachGenerator({
@@ -57,6 +59,7 @@ export function CoachGenerator({
   isSaving,
   canSave,
   onSave,
+  generationId,
 }: CoachGeneratorProps) {
   return (
     <>
@@ -141,6 +144,8 @@ export function CoachGenerator({
           </div>
         </section>
       )}
+
+      {generationId && <AiFeedback generationId={generationId} className="mb-4" />}
     </>
   );
 }

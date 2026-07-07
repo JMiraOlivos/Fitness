@@ -32,6 +32,13 @@ type TrendPoint = {
   sets: number;
 };
 
+type PrRecord = {
+  id: string;
+  metric_type: string;
+  value: number;
+  created_at: string;
+};
+
 function volume(logs: SetLog[]) {
   return logs.reduce((sum, log) => sum + Number(log.weight || 0) * Number(log.reps || 0), 0);
 }
@@ -83,6 +90,7 @@ export default function ExerciseProgressDetailPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [prRecords, setPrRecords] = useState<PrRecord[]>([]);
 
   const exercise = one(logs[0]?.exercises);
   const sortedLogs = useMemo(() => {
@@ -150,6 +158,15 @@ export default function ExerciseProgressDetailPage() {
 
       const page = await loadPage(0);
       setLogs(page);
+
+      const { data: prs } = await supabase
+        .from("personal_records")
+        .select("id, metric_type, value, created_at")
+        .eq("exercise_id", params.exerciseId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      setPrRecords((prs || []) as unknown as PrRecord[]);
+
       setIsLoading(false);
     }
 
@@ -243,6 +260,29 @@ export default function ExerciseProgressDetailPage() {
               ))}
             </div>
           </section>
+
+          {prRecords.length > 0 && (
+            <section className="mb-6 rounded-3xl border border-amber-500/40 bg-amber-950/20 p-4">
+              <p className="text-xs text-amber-300 uppercase font-bold tracking-wider">Récords personales</p>
+              <div className="mt-3 grid gap-2">
+                {prRecords.map((pr) => (
+                  <div key={pr.id} className="flex items-center justify-between rounded-xl bg-zinc-900/70 px-3 py-2 text-xs">
+                    <span className="text-zinc-400">
+                      {pr.metric_type === "weight" ? "Peso máximo" :
+                       pr.metric_type === "reps" ? "Repeticiones" :
+                       pr.metric_type === "volume" ? "Volumen" :
+                       pr.metric_type === "one_rep_max" ? "1RM estimado" :
+                       pr.metric_type}
+                    </span>
+                    <span className="font-bold text-amber-200">
+                      {pr.metric_type === "reps" ? pr.value : `${Math.round(pr.value)} kg`}
+                      <span className="text-zinc-500 ml-1">· {new Date(pr.created_at).toLocaleDateString("es-CL", { day: "2-digit", month: "short" })}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="grid gap-3">
             {sortedLogs.map((log) => {

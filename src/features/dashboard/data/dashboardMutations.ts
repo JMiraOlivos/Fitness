@@ -20,7 +20,7 @@ export async function generateRoutine(params: { diasDisponibles: number; enfoque
   });
 
   const rawBody = await response.text();
-  let data: (Partial<RutinaResponse> & { error?: string }) | null = null;
+  let data: (Partial<RutinaResponse> & { error?: string; generationId?: string }) | null = null;
   try {
     data = rawBody ? JSON.parse(rawBody) : null;
   } catch {
@@ -29,7 +29,7 @@ export async function generateRoutine(params: { diasDisponibles: number; enfoque
 
   if (!response.ok) throw new Error(data?.error || "No se pudo generar la rutina.");
 
-  return data?.rutinas || [];
+  return { rutinas: data?.rutinas || [], generationId: data?.generationId ?? null };
 }
 
 export async function saveRoutine(rutina: RutinaIA) {

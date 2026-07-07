@@ -85,7 +85,7 @@ export async function POST(req: Request) {
       ${JSON.stringify(payload)}${historialContext}`,
     });
 
-    await logAiGeneration({
+    const generationId = await logAiGeneration({
       supabase: auth?.supabase ?? null,
       userId: auth?.user.id ?? null,
       type: 'workout_insight',
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
       success: true,
     });
 
-    return Response.json(result.object);
+    return Response.json({ ...result.object, generationId });
   } catch (error) {
     console.error('Error analizando entrenamiento con IA:', error);
 

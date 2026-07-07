@@ -20,6 +20,7 @@ export function useDashboard() {
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastGenerationId, setLastGenerationId] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeProgram, setActiveProgram] = useState<ActiveProgram | null>(null);
@@ -124,8 +125,9 @@ export function useDashboard() {
     setSuccessMessage(null);
 
     try {
-      const rutinas = await generateRoutine({ diasDisponibles: Number(diasDisponibles), enfoque, restricciones });
+      const { rutinas, generationId } = await generateRoutine({ diasDisponibles: Number(diasDisponibles), enfoque, restricciones });
       setRutinasIA(rutinas);
+      setLastGenerationId(generationId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
     } finally {
@@ -196,6 +198,7 @@ export function useDashboard() {
     hasProfile,
     coachRecommendations,
     isLoadingCoach,
+    lastGenerationId,
     cerrarSesion,
     generarRutina,
     guardarRutina,

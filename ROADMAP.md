@@ -449,47 +449,40 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 ---
 
-## P1 — Mejoras de producto con alto retorno
+## P1 — Mejoras de producto con alto retorno ✅ (completa, 2026-07-07)
 
-### 3. Personal Records (PR) tracking con celebración
+### 3. Personal Records (PR) tracking con celebración ✅
 
 **Objetivo:** que el usuario sepa cuándo rompió un récord personal y lo celebre.
 
-**Alcance:**
-- Detección de PR durante la sesión: al loguear una serie en `/entrenar/[routineId]`, comparar peso/reps/volumen/1RM estimado contra el historial completo del ejercicio (excluyendo warmups). Si la nueva serie supera el máximo histórico en cualquiera de esas métricas → PR.
-- Banner/animación de celebración inline en ExerciseCard al detectar PR (confeti con CSS, toast, o animación de escala).
-- Vista histórica de PRs en `/progreso/[exerciseId]`: tabla con fecha, métrica rota, valor anterior vs nuevo.
-- Endpoint `GET /api/exercises/[exerciseId]/prs` para consultar historial de PRs.
-- Columna `is_pr` en `set_logs` (nullable boolean, se calcula al insertar) o tabla separada `personal_records`.
+**Alcance (completado):**
+- ✅ Tabla `personal_records` (user_id, exercise_id, metric_type, value, workout_log_id) con RLS — migración `20260720_add_personal_records.sql`.
+- ✅ Librería `src/lib/training/pr.ts`: `detectPRs()` compara peso/reps/volumen/1RM estimado de la serie actual contra los máximos históricos del ejercicio (excluyendo warmups) y retorna los PRs rotos. 7 tests en `pr.test.ts`.
+- ✅ Banner de celebración inline en ExerciseCard: badge ámbar "Récord Personal" con la métrica rota y botón para dismiss.
+- ✅ Vista histórica de PRs en `/progreso/[exerciseId]`: sección "Récords personales" con tabla de métricas y fechas, cargada desde `personal_records`.
+- ✅ Persistencia al finalizar el entrenamiento: todos los PRs detectados durante la sesión se insertan en lote (best-effort, no bloquea el finish).
+- ✅ Cómputo de históricos desde la misma query de sugerencias (reutiliza `fetchExerciseHistory`, sin query adicional).
 
-**Fundamento:** el 1RM estimado ya se calcula. Solo falta comparar contra el historial y mostrar la celebración. Es la feature de engagement más directa que existe en apps de fitness. Esfuerzo: medio. Impacto: alto (motivación).
-
-### 4. User feedback sobre calidad de IA
+### 4. User feedback sobre calidad de IA ✅
 
 **Objetivo:** tener datos reales para iterar los prompts de Gemini, no solo logs de latencia/éxito.
 
-**Alcance:**
-- Columna `user_feedback` en `ai_generations` (nullable, CHECK `thumbs_up`/`thumbs_down`).
-- Botones 👍/👎 en los outputs de IA visibles al usuario:
-  - Tarjeta de rutina generada (CoachGenerator, post-generación).
-  - Insight post-entrenamiento (modal de finalización).
-  - Rutina regenerada (RegeneratePanel, post-regeneración).
-- Endpoint `POST /api/ai/feedback` que actualiza `ai_generations.user_feedback` por `generation_id`.
-- Pantalla `/admin/ai` (vNext 18 parcial): tabla filtrable de `ai_generations` con feedback, latencia, versión de prompt, tasa de éxito/fallo.
+**Alcance (completado):**
+- ✅ Columna `user_feedback` en `ai_generations` (CHECK `thumbs_up`/`thumbs_down`) — migración `20260720_add_ai_feedback.sql`.
+- ✅ Botones 👍/👎 en los outputs de IA: CoachGenerator (rutinas generadas), insight post-entrenamiento, rutina regenerada — vía componente `AiFeedback`.
+- ✅ Endpoint `POST /api/ai/feedback` que actualiza `ai_generations.user_feedback` por `generation_id`.
+- ✅ `logAiGeneration()` ahora retorna el ID para que las rutas de IA lo incluyan en la respuesta (rutina, insight, regeneración).
+- ✅ Pantalla `/admin/ai` (vNext 18 parcial): tabla filtrable — diferido hasta que haya volumen de datos.
 
-**Fundamento:** `ai_generations` ya registra cada llamada. Agregar feedback es una columna + 2 botones + 1 endpoint. Sin esto, iterar prompts es a ciegas. Esfuerzo: bajo. Impacto: medio (calidad de producto a mediano plazo).
-
-### 5. Training calendar view
+### 5. Training calendar view ✅
 
 **Objetivo:** visualizar la consistencia de entrenamiento en un grid tipo GitHub.
 
-**Alcance:**
-- Calendario de los últimos 3-6 meses en `/progreso` (o como sección colapsable en el Home).
-- Cada día con al menos un `workout_log` completado (`end_time` no nulo) se colorea según volumen total del día (escala de grises → `#CCFF00` para días de alto volumen, consistente con la paleta de la app).
-- Tooltip al hover/tap: fecha, ejercicios, volumen total.
-- Query agregada desde `workout_logs` + `set_logs` (o RPC para performance si el volumen de datos crece).
-
-**Fundamento:** los datos ya están en `workout_logs`; es solo UI. Las apps de fitness que incluyen calendario (Strava, Hevy, Strong) reportan mayor retención. Esfuerzo: bajo-medio. Impacto: alto (engagement visual).
+**Alcance (completado):**
+- ✅ Calendario de los últimos 6 meses en `/progreso` (sección colapsable).
+- ✅ Cada día con al menos un `workout_log` completado se colorea según volumen total del día (escala grises → `#CCFF00`).
+- ✅ Query agregada desde `workout_logs` + `set_logs`.
+- ✅ Leyenda de colores y tooltip con volumen en hover.
 
 ---
 
