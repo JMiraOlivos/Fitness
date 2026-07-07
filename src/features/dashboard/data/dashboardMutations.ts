@@ -21,10 +21,20 @@ export async function generateRoutine(params: { diasDisponibles: number; enfoque
     body: JSON.stringify(params),
   });
 
-  const data = (await response.json()) as Partial<RutinaResponse> & { error?: string };
-  if (!response.ok) throw new Error(data.error || "No se pudo generar la rutina.");
+  const rawBody = await response.text();
+  let data: (Partial<RutinaResponse> & { error?: string }) | null = null;
+  try {
+    data = rawBody ? JSON.parse(rawBody) : null;
+  } catch {
+    // The platform (timeout, crash, ...) returned a non-JSON error page instead of
+    // our API route's JSON response — surface a readable message instead of the
+    // raw JSON.parse failure.
+    throw new Error("El servidor tardó demasiado o falló al generar la rutina. Intenta de nuevo.");
+  }
 
-  return data.rutinas || [];
+  if (!response.ok) throw new Error(data?.error || "No se pudo generar la rutina.");
+
+  return data?.rutinas || [];
 }
 
 export async function saveRoutine(rutina: RutinaIA) {
