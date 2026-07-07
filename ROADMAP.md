@@ -279,9 +279,13 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 - ✅ Modal "Antes de partir" en `/entrenar/[routineId]` (botones `Adaptar entrenamiento` / `Entrenar igual`, toma <20s), banners de advertencia visibles durante toda la sesión, y tarjetas de ejercicios accesorios/aislamiento atenuadas con badge "Opcional hoy" cuando el tiempo disponible es bajo — la adaptación es puramente visual/client-side, **no regenera la rutina con IA** (cumple el DoD original de "se adapta sin regenerar todo").
 - El insert de `readiness_logs` es best-effort: si falla, no bloquea el inicio del entrenamiento (el aviso en pantalla ya se calculó client-side).
 
-## Fase vNext 4 — Catálogo curado de ejercicios
+## Fase vNext 4 — Catálogo curado de ejercicios ✅ (completa, 2026-07-07)
 
-🟡 Parcial. Ya cubierto (Fase 6/8 de este roadmap): dedup por nombre/músculo/equipo normalizado, taxonomía fija de 12 grupos musculares + 5 tipos de equipo con CHECK constraints (`src/lib/exerciseTaxonomy.ts`), separación `owner_id` global/personal. **No existe** `canonical_name`, `aliases`, `movement_pattern`, `difficulty`, `is_verified`, ni contenido (`instructions`/`safety_notes`/media). Sustitución de ejercicio (ya implementada en Fase 8) hoy solo filtra por `target_muscle` — no por patrón de movimiento ni dificultad. Alcance restante real: aliases + verificación + pantalla `/admin/exercises` para curar duplicados; es esfuerzo alto y de menor urgencia ahora que el dedup automático ya contiene el problema más agudo (contaminación de catálogo).
+- ✅ Migración `20260715_add_exercise_catalog_curation.sql`: `exercises.canonical_name`, `aliases text[]`, `movement_pattern` (CHECK contra los 12 valores de `MOVEMENT_PATTERNS`), `difficulty` (CHECK `beginner`/`intermediate`/`advanced`) y `is_verified`. Además `profiles.is_admin boolean default false` — no existía ningún concepto de rol/staff en la app; se agregó el mínimo necesario para poder gatear `/admin/exercises` con RLS real (`"Admins can update global exercises"`, `FOR UPDATE USING/WITH CHECK owner_id is null and exists(... profiles.is_admin)`). El bootstrap del primer admin es manual (flip directo en la base) — no hay UI para promover admins, a propósito, dado el bajo volumen esperado.
+- ✅ Migración `20260716_add_alias_matching.sql`: `_insert_routine_exercises` ahora matchea también contra `aliases` (case-insensitive), no solo `name` exacto — cierra el gap real de "Press banca" vs "Press de banca" vs "Barbell bench press" una vez que un admin curó los aliases, siempre scopeado al mismo `target_muscle`/`equipment` (no genera falsos positivos entre grupos musculares distintos).
+- ✅ `/admin/exercises`: pantalla de curación gateada por `profiles.is_admin` (pantalla "No autorizado" si no lo es), lista el catálogo global (`owner_id is null`) con filtro por grupo muscular y búsqueda por nombre, y edición inline de `canonical_name`/`aliases`/`movement_pattern`/`difficulty`/`is_verified` por ejercicio, guardando directo vía `update` (sin RPC — se apoya enteramente en la policy de RLS nueva).
+- ✅ 3 tests de integración nuevos (22 en total, sin regresiones): un alias curado reutiliza el ejercicio canónico en vez de crear uno duplicado; ese mismo alias **no** matchea si el grupo muscular es distinto; un admin puede actualizar el catálogo global y un usuario regular no (la policy de RLS hace que el `UPDATE` afecte 0 filas, no que tire error — hay que afirmar `rowCount === 0`, no `.rejects.toThrow()`).
+- Nota de alcance: se dejó fuera a propósito la acción interactiva de "fusionar duplicados históricos" (que implicaría repuntar `routine_exercises`/`set_logs` y borrar filas) — el dedup automático existente más el matching de aliases hacia adelante bajan la urgencia de resolver duplicados ya creados; se retoma si en la práctica se acumulan casos reales.
 
 ## Fase vNext 5 — Home orientado a "qué hago hoy" ✅ (completa, 2026-07-07)
 
@@ -391,7 +395,7 @@ Con esto queda cerrado el bloque P1 completo del roadmap vNext.
 
 **P2 — después**
 
-1. **vNext 4 (resto) — Aliases, verificación y `/admin/exercises`.**
+1. ~~**vNext 4 (resto) — Aliases, verificación y `/admin/exercises`.**~~ — ✅ completa (2026-07-07): migraciones de curación + matching de aliases, `profiles.is_admin`, pantalla `/admin/exercises`.
 2. **vNext 14 (resto) — Cola offline + sync de series.**
 3. **vNext 15 — Personalización avanzada.**
 4. **vNext 17 — Coach IA proactivo.**

@@ -21,6 +21,7 @@ export type Database = {
           injury_notes: string | null;
           equipment_available: string | null;
           experience_level: string | null;
+          is_admin: boolean;
           created_at: string;
         };
         Insert: {
@@ -32,6 +33,7 @@ export type Database = {
           injury_notes?: string | null;
           equipment_available?: string | null;
           experience_level?: string | null;
+          is_admin?: boolean;
           created_at?: string;
         };
         Update: {
@@ -43,6 +45,7 @@ export type Database = {
           injury_notes?: string | null;
           equipment_available?: string | null;
           experience_level?: string | null;
+          is_admin?: boolean;
           created_at?: string;
         };
         Relationships: [];
@@ -54,6 +57,11 @@ export type Database = {
           target_muscle: string;
           equipment: string;
           owner_id: string | null;
+          canonical_name: string | null;
+          aliases: string[];
+          movement_pattern: string | null;
+          difficulty: string | null;
+          is_verified: boolean;
           created_at: string;
         };
         Insert: {
@@ -62,6 +70,11 @@ export type Database = {
           target_muscle: string;
           equipment: string;
           owner_id?: string | null;
+          canonical_name?: string | null;
+          aliases?: string[];
+          movement_pattern?: string | null;
+          difficulty?: string | null;
+          is_verified?: boolean;
           created_at?: string;
         };
         Update: {
@@ -70,6 +83,11 @@ export type Database = {
           target_muscle?: string;
           equipment?: string;
           owner_id?: string | null;
+          canonical_name?: string | null;
+          aliases?: string[];
+          movement_pattern?: string | null;
+          difficulty?: string | null;
+          is_verified?: boolean;
           created_at?: string;
         };
         Relationships: [];
