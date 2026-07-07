@@ -256,3 +256,55 @@ describe("mesociclos / programs", () => {
     );
   });
 });
+
+describe("readiness_logs RLS", () => {
+  it("lets a user insert and read their own readiness log", async () => {
+    const userId = await createUser("readiness-owner@example.com");
+
+    const logId = await asUser(userId, async () => {
+      const { rows } = await client.query<{ id: string }>(
+        `insert into public.readiness_logs (user_id, energy, sleep_quality, soreness, joint_pain, available_minutes, notes)
+         values ($1, 4, 3, 2, false, 45, 'Todo bien') returning id`,
+        [userId]
+      );
+      return rows[0].id;
+    });
+
+    const { rows } = await asUser(userId, () =>
+      client.query("select energy, joint_pain from public.readiness_logs where id = $1", [logId])
+    );
+    expect(rows[0].energy).toBe(4);
+    expect(rows[0].joint_pain).toBe(false);
+  });
+
+  it("rejects inserting a readiness log under another user's id", async () => {
+    const userId = await createUser("readiness-user@example.com");
+    const otherUserId = await createUser("readiness-other@example.com");
+
+    await expect(
+      asUser(userId, () =>
+        client.query(
+          `insert into public.readiness_logs (user_id, energy, sleep_quality, soreness, joint_pain)
+           values ($1, 3, 3, 3, false)`,
+          [otherUserId]
+        )
+      )
+    ).rejects.toThrow();
+  });
+
+  it("does not let a user read another user's readiness log", async () => {
+    const ownerId = await createUser("readiness-owner2@example.com");
+    const intruderId = await createUser("readiness-intruder@example.com");
+
+    await asUser(ownerId, () =>
+      client.query(
+        `insert into public.readiness_logs (user_id, energy, sleep_quality, soreness, joint_pain)
+         values ($1, 2, 2, 4, true)`,
+        [ownerId]
+      )
+    );
+
+    const { rows } = await asUser(intruderId, () => client.query("select * from public.readiness_logs where user_id = $1", [ownerId]));
+    expect(rows).toHaveLength(0);
+  });
+});

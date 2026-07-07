@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, CheckCircle, Dumbbell, Loader2, Play, Plus, Repeat, Sparkles, Square, Timer, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, CheckCircle, Dumbbell, Loader2, Play, Plus, Repeat, Sparkles, Square, Timer, Wand2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
 import { authFetch } from "@/lib/authFetch";
 import { recommendNextSet, type ExercisePriority } from "@/lib/training/progression";
+import { getReadinessGuidance, type ReadinessGuidance } from "@/lib/training/readiness";
 
 type ExerciseRow = {
   id: string;
@@ -84,7 +85,22 @@ type ExerciseSuggestion = {
   suggestionLabel: string;
 };
 
+type ReadinessForm = {
+  energy: number;
+  sleepQuality: number;
+  soreness: number;
+  jointPain: boolean;
+  availableMinutes: number | null;
+  notes: string;
+};
+
 const REST_DURATION_SECONDS = 90;
+
+const AVAILABLE_MINUTES_OPTIONS = [30, 45, 60, 75];
+
+function defaultReadinessForm(): ReadinessForm {
+  return { energy: 3, sleepQuality: 3, soreness: 3, jointPain: false, availableMinutes: null, notes: "" };
+}
 
 const PRIORITY_LABELS: Record<ExercisePriority, string> = {
   principal: "principal",
@@ -182,6 +198,9 @@ export default function EntrenarPage() {
   const [showRegeneratePanel, setShowRegeneratePanel] = useState(false);
   const [regenerateInstructions, setRegenerateInstructions] = useState("");
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showReadinessModal, setShowReadinessModal] = useState(false);
+  const [readinessForm, setReadinessForm] = useState<ReadinessForm>(defaultReadinessForm());
+  const [readinessGuidance, setReadinessGuidance] = useState<ReadinessGuidance | null>(null);
   const exerciseRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
@@ -511,12 +530,43 @@ export default function EntrenarPage() {
     return data.id;
   }
 
-  async function iniciarEntrenamiento() {
+  async function iniciarConReadiness(shouldAdapt: boolean) {
+    setShowReadinessModal(false);
     setError(null);
     setSuccessMessage(null);
 
+    const guidance = shouldAdapt
+      ? getReadinessGuidance({
+          energy: readinessForm.energy,
+          sleepQuality: readinessForm.sleepQuality,
+          jointPain: readinessForm.jointPain,
+          availableMinutes: readinessForm.availableMinutes,
+          notes: readinessForm.notes,
+        })
+      : null;
+    setReadinessGuidance(guidance);
+
     try {
-      await ensureWorkoutLog();
+      const logId = await ensureWorkoutLog();
+
+      if (shouldAdapt && user) {
+        const { error: readinessError } = await supabase.from("readiness_logs").insert({
+          user_id: user.id,
+          workout_log_id: logId,
+          energy: readinessForm.energy,
+          sleep_quality: readinessForm.sleepQuality,
+          soreness: readinessForm.soreness,
+          joint_pain: readinessForm.jointPain,
+          available_minutes: readinessForm.availableMinutes,
+          notes: readinessForm.notes || null,
+        });
+
+        // Best-effort: a failed readiness log shouldn't block the workout that's
+        // already started — the on-screen guidance was computed client-side anyway.
+        if (readinessError) {
+          console.error("No se pudo guardar el readiness check-in:", readinessError.message);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo iniciar el entrenamiento.");
     }
@@ -810,6 +860,153 @@ export default function EntrenarPage() {
         )}
       </header>
 
+      {readinessGuidance && readinessGuidance.warnings.length > 0 && (
+        <section className="mb-6 grid gap-2">
+          {readinessGuidance.warnings.map((warning) => (
+            <div
+              key={warning}
+              className="flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <p>{warning}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {showReadinessModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-6">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-zinc-800 bg-zinc-950 p-6 sm:rounded-3xl">
+            <h2 className="text-xl font-black">Antes de partir</h2>
+            <p className="mt-1 text-xs text-zinc-500">Cuéntanos cómo llegas hoy — toma menos de 20 segundos.</p>
+
+            <div className="mt-5">
+              <p className="text-xs font-bold uppercase text-zinc-400">Energía</p>
+              <div className="mt-2 grid grid-cols-5 gap-2">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setReadinessForm((current) => ({ ...current, energy: value }))}
+                    className={`rounded-xl py-2 text-sm font-black ${
+                      readinessForm.energy === value ? "bg-[#CCFF00] text-black" : "bg-zinc-900 text-zinc-400"
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-xs font-bold uppercase text-zinc-400">Sueño</p>
+              <div className="mt-2 grid grid-cols-5 gap-2">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setReadinessForm((current) => ({ ...current, sleepQuality: value }))}
+                    className={`rounded-xl py-2 text-sm font-black ${
+                      readinessForm.sleepQuality === value ? "bg-[#CCFF00] text-black" : "bg-zinc-900 text-zinc-400"
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-xs font-bold uppercase text-zinc-400">Dolor muscular</p>
+              <div className="mt-2 grid grid-cols-5 gap-2">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setReadinessForm((current) => ({ ...current, soreness: value }))}
+                    className={`rounded-xl py-2 text-sm font-black ${
+                      readinessForm.soreness === value ? "bg-[#CCFF00] text-black" : "bg-zinc-900 text-zinc-400"
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-xs font-bold uppercase text-zinc-400">Dolor articular</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReadinessForm((current) => ({ ...current, jointPain: false }))}
+                  className={`rounded-xl py-2 text-sm font-black ${
+                    !readinessForm.jointPain ? "bg-[#CCFF00] text-black" : "bg-zinc-900 text-zinc-400"
+                  }`}
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReadinessForm((current) => ({ ...current, jointPain: true }))}
+                  className={`rounded-xl py-2 text-sm font-black ${
+                    readinessForm.jointPain ? "bg-[#CCFF00] text-black" : "bg-zinc-900 text-zinc-400"
+                  }`}
+                >
+                  Sí
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-xs font-bold uppercase text-zinc-400">Tiempo disponible</p>
+              <div className="mt-2 grid grid-cols-4 gap-2">
+                {AVAILABLE_MINUTES_OPTIONS.map((minutes) => (
+                  <button
+                    key={minutes}
+                    type="button"
+                    onClick={() => setReadinessForm((current) => ({ ...current, availableMinutes: minutes }))}
+                    className={`rounded-xl py-2 text-sm font-black ${
+                      readinessForm.availableMinutes === minutes ? "bg-[#CCFF00] text-black" : "bg-zinc-900 text-zinc-400"
+                    }`}
+                  >
+                    {minutes}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="mt-4 grid gap-1 text-xs text-zinc-400">
+              Nota opcional
+              <textarea
+                value={readinessForm.notes}
+                onChange={(event) => setReadinessForm((current) => ({ ...current, notes: event.target.value }))}
+                rows={2}
+                placeholder="Ej: dolor de hombro, mala noche de sueño..."
+                className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-white outline-none focus:border-[#CCFF00] resize-none"
+              />
+            </label>
+
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => void iniciarConReadiness(true)}
+                className="flex-1 rounded-2xl bg-[#CCFF00] py-3 text-sm font-black text-black"
+              >
+                Adaptar entrenamiento
+              </button>
+              <button
+                type="button"
+                onClick={() => void iniciarConReadiness(false)}
+                className="flex-1 rounded-2xl bg-zinc-900 py-3 text-sm font-bold text-zinc-300"
+              >
+                Entrenar igual
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {restSecondsLeft !== null && (
         <div className="fixed bottom-20 left-0 right-0 z-40 mx-auto max-w-md px-6">
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#CCFF00]/40 bg-black/95 p-4 shadow-lg shadow-black/50 backdrop-blur-md">
@@ -857,7 +1054,7 @@ export default function EntrenarPage() {
 
       <section className="mb-6 grid grid-cols-2 gap-3">
         <button
-          onClick={iniciarEntrenamiento}
+          onClick={() => setShowReadinessModal(true)}
           disabled={Boolean(workoutLogId) || isStarting}
           className="rounded-2xl bg-[#CCFF00] px-4 py-3 font-black text-black inline-flex items-center justify-center gap-2 disabled:opacity-40"
         >
@@ -893,6 +1090,9 @@ export default function EntrenarPage() {
           const localLogs = exercise?.id ? setLogs[exercise.id] || [] : [];
           const suggestion = exercise?.id ? suggestions[exercise.id] : undefined;
           const isCompleted = completedExerciseIds.has(item.id);
+          const isOptionalToday =
+            Boolean(readinessGuidance?.deprioritizeAccessories) &&
+            (item.priority === "accesorio" || item.priority === "aislamiento");
 
           return (
             <article
@@ -902,13 +1102,16 @@ export default function EntrenarPage() {
               }}
               className={`rounded-3xl border p-4 transition-opacity ${
                 isCompleted ? "border-zinc-800 bg-zinc-950/60 opacity-60" : "border-zinc-800 bg-zinc-950"
-              }`}
+              } ${isOptionalToday && !isCompleted ? "opacity-70" : ""}`}
             >
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs text-[#CCFF00] font-bold uppercase">Ejercicio {item.order_index}</p>
                   <h2 className="text-xl font-black">{exercise?.name || "Ejercicio"}</h2>
                   <p className="text-xs text-zinc-500 mt-1">{exercise?.target_muscle || "Músculo"} • {exercise?.equipment || "Equipo"}</p>
+                  {isOptionalToday && (
+                    <p className="mt-1 text-[10px] font-bold uppercase text-amber-300">Opcional hoy · poco tiempo</p>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <button

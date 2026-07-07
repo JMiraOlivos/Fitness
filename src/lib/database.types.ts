@@ -366,6 +366,60 @@ export type Database = {
           },
         ];
       };
+      readiness_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          workout_log_id: string | null;
+          energy: number | null;
+          sleep_quality: number | null;
+          soreness: number | null;
+          joint_pain: boolean;
+          available_minutes: number | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          workout_log_id?: string | null;
+          energy?: number | null;
+          sleep_quality?: number | null;
+          soreness?: number | null;
+          joint_pain?: boolean;
+          available_minutes?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          workout_log_id?: string | null;
+          energy?: number | null;
+          sleep_quality?: number | null;
+          soreness?: number | null;
+          joint_pain?: boolean;
+          available_minutes?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "readiness_logs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "readiness_logs_workout_log_id_fkey";
+            columns: ["workout_log_id"];
+            isOneToOne: false;
+            referencedRelation: "workout_logs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: {

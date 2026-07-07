@@ -272,9 +272,12 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 - ✅ `priority` ya viene del schema real (Fase vNext 1, `routine_exercises.priority`) y se pasa a `recommendNextSet`; sigue asumiendo `"principal"` solo para rutinas guardadas antes de esa migración (campo `null`).
 - Pendiente (fuera de este alcance): no hay `fatigue.ts` con detección de fatiga multi-sesión todavía (ver Fase vNext 7, que ya tiene la tendencia histórica de 4 sesiones como insumo).
 
-## Fase vNext 3 — Readiness y seguridad
+## Fase vNext 3 — Readiness y seguridad ✅ (completa, 2026-07-07)
 
-⬜ Pendiente, no existe. No hay tabla `readiness_logs` ni modal previo al entrenamiento. Mantener la propuesta: tabla con energía/sueño/dolor articular/tiempo disponible + RLS, modal de ~20s antes de iniciar sesión, reglas de adaptación (reducir volumen si energía+sueño bajos, sustituir ante dolor articular, recortar accesorios si hay poco tiempo) y guardrail de texto libre ante señales de riesgo (dolor agudo, mareo, etc.).
+- ✅ Migración `20260712_add_readiness_logs.sql`: tabla `readiness_logs` (energía, calidad de sueño, dolor muscular 1-5, dolor articular, minutos disponibles, nota libre) con RLS (select/insert propios), cubierta con 3 tests de integración (inserta/lee propio, rechaza insertar bajo otro `user_id`, rechaza leer logs ajenos).
+- ✅ Reglas de adaptación en `src/lib/training/readiness.ts` (`getReadinessGuidance`), puras y testeadas (8 tests): energía+sueño bajos → aviso de reducir volumen ~20-30%; dolor articular → aviso a usar "Sustituir"; poco tiempo (≤30 min) → marca ejercicios `accesorio`/`aislamiento` como opcionales hoy (usa el campo `priority` real de Fase vNext 1); nota de texto libre con palabras de riesgo (mareo, dolor agudo, etc.) → aviso de consultar a un profesional.
+- ✅ Modal "Antes de partir" en `/entrenar/[routineId]` (botones `Adaptar entrenamiento` / `Entrenar igual`, toma <20s), banners de advertencia visibles durante toda la sesión, y tarjetas de ejercicios accesorios/aislamiento atenuadas con badge "Opcional hoy" cuando el tiempo disponible es bajo — la adaptación es puramente visual/client-side, **no regenera la rutina con IA** (cumple el DoD original de "se adapta sin regenerar todo").
+- El insert de `readiness_logs` es best-effort: si falla, no bloquea el inicio del entrenamiento (el aviso en pantalla ya se calculó client-side).
 
 ## Fase vNext 4 — Catálogo curado de ejercicios
 
@@ -346,8 +349,8 @@ Reordenado desde la matriz del análisis original, con lo ya cubierto (Fases 6/8
 
 1. ~~**vNext 2 — Motor de progresión**~~ — ✅ base completa (2026-07-07): `src/lib/training/progression.ts` con tests, ya wireado en `/entrenar/[routineId]`. Se hizo antes que la 9 porque era acotado y de bajo riesgo (funciones puras); la extracción completa del resto del componente sigue pendiente.
 2. ~~**vNext 1 — Prescripción real**~~ — ✅ completa (2026-07-07): migración + prompts + RPCs + UI. Cierra el loop con la 2 (`priority` real en vez de asumida).
-3. **vNext 9 — Arquitectura por features.** Sigue pendiente para el resto del componente: `/entrenar/[routineId]/page.tsx` y `/app/page.tsx` todavía mezclan UI/queries/estado.
-4. **vNext 3 — Readiness.** Gap de seguridad/personalización diario, esfuerzo medio, tabla + modal + reglas.
+3. ~~**vNext 3 — Readiness**~~ — ✅ completa (2026-07-07): tabla + RLS + reglas de adaptación testeadas + modal. Se priorizó sobre la 9 por ser autocontenida (no toca la arquitectura del componente, solo la extiende).
+4. **vNext 9 — Arquitectura por features.** Sigue pendiente: `/entrenar/[routineId]/page.tsx` (ahora más grande tras las Fases 1-3 de vNext) y `/app/page.tsx` todavía mezclan UI/queries/estado — cuanto más se pospone, más grande queda el refactor.
 5. **vNext 11 (resto) — Quitar `continue-on-error` de integración + E2E.** Ya con la base puesta, es cerrar el loop de calidad, no construirlo desde cero.
 
 **P1 — siguiente**
