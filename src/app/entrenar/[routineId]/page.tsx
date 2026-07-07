@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
 import { authFetch } from "@/lib/authFetch";
+import { recommendNextSet } from "@/lib/training/progression";
 
 type ExerciseRow = {
   id: string;
@@ -29,6 +30,7 @@ type RoutineRow = {
   id: string;
   title: string;
   description: string | null;
+  is_deload_week: boolean | null;
   routine_exercises?: RoutineExerciseRow[];
 };
 
@@ -106,7 +108,7 @@ function getAverageRpe(logs: LocalSetLog[]) {
   return rpeLogs.reduce((sum, log) => sum + Number(log.rpe || 0), 0) / rpeLogs.length;
 }
 
-function buildSuggestion(sessionRows: HistorySetRow[]): ExerciseSuggestion | null {
+function buildSuggestion(sessionRows: HistorySetRow[], isDeloadWeek: boolean): ExerciseSuggestion | null {
   const workingRows = sessionRows.filter((row) => !row.is_warmup);
   if (workingRows.length === 0) return null;
 
@@ -115,28 +117,20 @@ function buildSuggestion(sessionRows: HistorySetRow[]): ExerciseSuggestion | nul
   const rpeValues = workingRows.filter((row) => row.rpe !== null).map((row) => row.rpe as number);
   const averageRpe = rpeValues.length > 0 ? rpeValues.reduce((sum, rpe) => sum + rpe, 0) / rpeValues.length : null;
 
-  let suggestedWeight = maxWeight;
-  let suggestionLabel = "Repite el peso, ajusta reps si puedes.";
-
-  if (averageRpe !== null) {
-    if (averageRpe <= 7) {
-      suggestedWeight = maxWeight + 2.5;
-      suggestionLabel = `RPE ${averageRpe.toFixed(1)} bajo. Sube +2.5 kg.`;
-    } else if (averageRpe >= 9) {
-      suggestedWeight = maxWeight;
-      suggestionLabel = `RPE ${averageRpe.toFixed(1)} alto. Mantén el peso.`;
-    } else {
-      suggestionLabel = `RPE ${averageRpe.toFixed(1)}. Mantén el peso, busca más reps.`;
-    }
-  }
+  // Exercise priority (principal/accesorio/aislamiento) isn't in the schema yet
+  // (ROADMAP.md, Fase vNext 1) — defaults to "principal" until that lands.
+  const recommendation = recommendNextSet({
+    lastSession: { maxWeight, lastReps: lastSet.reps, averageRpe },
+    isDeloadWeek,
+  });
 
   return {
     lastWeight: lastSet.weight,
     lastReps: lastSet.reps,
     lastRpe: lastSet.rpe,
     lastDate: lastSet.created_at,
-    suggestedWeight,
-    suggestionLabel,
+    suggestedWeight: recommendation?.suggestedWeight ?? maxWeight,
+    suggestionLabel: recommendation?.reason ?? "Repite el peso, ajusta reps si puedes.",
   };
 }
 
@@ -187,7 +181,7 @@ export default function EntrenarPage() {
     return [...(routine?.routine_exercises || [])].sort((a, b) => a.order_index - b.order_index);
   }, [routine]);
 
-  const cargarSugerencias = useCallback(async (userId: string, exerciseIds: string[]) => {
+  const cargarSugerencias = useCallback(async (userId: string, exerciseIds: string[], isDeloadWeek: boolean) => {
     const { data: historyRows, error: historyError } = await supabase
       .from("set_logs")
       .select("exercise_id, workout_log_id, weight, reps, rpe, is_warmup, created_at, workout_logs!inner(user_id)")
@@ -216,7 +210,7 @@ export default function EntrenarPage() {
     const nextSuggestions: Record<string, ExerciseSuggestion> = {};
 
     for (const exerciseId of Object.keys(sessionsByExercise)) {
-      const suggestion = buildSuggestion(sessionsByExercise[exerciseId]);
+      const suggestion = buildSuggestion(sessionsByExercise[exerciseId], isDeloadWeek);
       if (suggestion) {
         nextSuggestions[exerciseId] = suggestion;
       }
@@ -236,6 +230,7 @@ export default function EntrenarPage() {
           id,
           title,
           description,
+          is_deload_week,
           routine_exercises (
             id,
             order_index,
@@ -267,7 +262,7 @@ export default function EntrenarPage() {
         .filter((id): id is string => Boolean(id));
 
       if (exerciseIds.length > 0) {
-        await cargarSugerencias(userId, exerciseIds);
+        await cargarSugerencias(userId, exerciseIds, Boolean(loadedRoutine.is_deload_week));
       }
 
       setIsLoading(false);
@@ -726,6 +721,11 @@ export default function EntrenarPage() {
             <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Entrenamiento activo</p>
             <h1 className="text-3xl font-black tracking-tight mt-1">{routine.title}</h1>
             <p className="text-sm text-zinc-400 mt-2">{routine.description || "Registra peso, repeticiones y RPE por serie."}</p>
+            {routine.is_deload_week && (
+              <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-3 py-1 text-[10px] font-bold uppercase text-amber-300">
+                Semana de deload · sin PRs, ~10% menos de carga
+              </p>
+            )}
           </div>
           <button
             type="button"
