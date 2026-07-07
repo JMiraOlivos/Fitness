@@ -28,5 +28,41 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests
+        run: npm test
+
       - name: Build
         run: npm run build
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-retries=10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fitness_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      # First real run against a hosted CI Postgres — this repo's sandbox has no
+      # Docker/network access to verify it end-to-end (see ROADMAP.md's established
+      # pattern of shipping sandbox-unverifiable changes with an explicit caveat).
+      # Remove continue-on-error once this job is confirmed green.
+      - name: Integration tests
+        continue-on-error: true
+        run: npm run test:integration

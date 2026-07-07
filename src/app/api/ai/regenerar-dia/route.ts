@@ -49,7 +49,9 @@ export async function POST(req: Request) {
 
     const { data: routine, error: routineError } = await auth.supabase
       .from("routines")
-      .select("id, title, description, routine_exercises ( target_sets, target_reps, exercises ( name, target_muscle ) )")
+      .select(
+        "id, title, description, is_deload_week, routine_exercises ( target_sets, target_reps, exercises ( name, target_muscle ) )"
+      )
       .eq("id", routineId)
       .maybeSingle();
 
@@ -93,6 +95,10 @@ export async function POST(req: Request) {
             .join("\n      ")}`
         : "";
 
+    const deloadContext = routine.is_deload_week
+      ? "\n      Este día pertenece a una SEMANA DE DESCARGA (deload) del mesociclo: reduce el volumen (series por ejercicio) en 40-50% y baja la intensidad sugerida en las notas de cada ejercicio, manteniendo los mismos patrones de movimiento/grupos musculares."
+      : "";
+
     const google = createGoogleGenerativeAI({ apiKey });
 
     const result = await generateObject({
@@ -107,7 +113,7 @@ export async function POST(req: Request) {
       - Ejercicios actuales: ${currentExercises.join(", ") || "Ninguno registrado"}
 
       Instrucciones del usuario para esta regeneración: ${instrucciones || "Ninguna, propone una variante distinta pero con el mismo enfoque."}
-      ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ""}${historialContext}
+      ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ""}${historialContext}${deloadContext}
 
       Genera un nuevo título, descripción y lista de ejercicios para este día.`,
       schema: diaSchema,
