@@ -29,11 +29,24 @@ export default function Dashboard() {
 
       {dashboard.user && !dashboard.hasProfile && <OnboardingBanner />}
 
+      {/* "Hoy": el CTA de entrenar y las rutinas guardadas van primero — es la
+          acción principal, generar una rutina nueva es secundaria (Fase vNext 5). */}
+      <QuickActions />
+
+      <SavedRoutines
+        hasUser={Boolean(dashboard.user)}
+        rutinas={dashboard.rutinasGuardadas}
+        isLoading={dashboard.isLoadingSaved}
+        onRefresh={() => void dashboard.cargarRutinasGuardadas()}
+        confirmingDeleteId={dashboard.confirmingDeleteId}
+        onToggleConfirmDelete={dashboard.setConfirmingDeleteId}
+        isDeleting={dashboard.isDeleting}
+        onDelete={(rutina) => void dashboard.borrarRutina(rutina)}
+      />
+
       {dashboard.activeProgram && <ActiveProgramCard program={dashboard.activeProgram} />}
 
       <WeeklyMetrics metrics={dashboard.metrics} isLoading={dashboard.isLoadingMetrics} />
-
-      <QuickActions />
 
       <CoachGenerator
         diasDisponibles={dashboard.diasDisponibles}
@@ -50,17 +63,6 @@ export default function Dashboard() {
         isSaving={dashboard.isSaving}
         canSave={Boolean(dashboard.user)}
         onSave={(rutina) => void dashboard.guardarRutina(rutina)}
-      />
-
-      <SavedRoutines
-        hasUser={Boolean(dashboard.user)}
-        rutinas={dashboard.rutinasGuardadas}
-        isLoading={dashboard.isLoadingSaved}
-        onRefresh={() => void dashboard.cargarRutinasGuardadas()}
-        confirmingDeleteId={dashboard.confirmingDeleteId}
-        onToggleConfirmDelete={dashboard.setConfirmingDeleteId}
-        isDeleting={dashboard.isDeleting}
-        onDelete={(rutina) => void dashboard.borrarRutina(rutina)}
       />
     </main>
   );

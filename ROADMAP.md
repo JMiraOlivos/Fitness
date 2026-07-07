@@ -283,13 +283,17 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 
 🟡 Parcial. Ya cubierto (Fase 6/8 de este roadmap): dedup por nombre/músculo/equipo normalizado, taxonomía fija de 12 grupos musculares + 5 tipos de equipo con CHECK constraints (`src/lib/exerciseTaxonomy.ts`), separación `owner_id` global/personal. **No existe** `canonical_name`, `aliases`, `movement_pattern`, `difficulty`, `is_verified`, ni contenido (`instructions`/`safety_notes`/media). Sustitución de ejercicio (ya implementada en Fase 8) hoy solo filtra por `target_muscle` — no por patrón de movimiento ni dificultad. Alcance restante real: aliases + verificación + pantalla `/admin/exercises` para curar duplicados; es esfuerzo alto y de menor urgencia ahora que el dedup automático ya contiene el problema más agudo (contaminación de catálogo).
 
-## Fase vNext 5 — Home orientado a "qué hago hoy"
+## Fase vNext 5 — Home orientado a "qué hago hoy" ✅ (completa, 2026-07-07)
 
-🟡 Parcial. `src/app/page.tsx` (558 líneas) ya muestra métricas semanales reales, programa activo y rutinas guardadas, pero mezcla generación IA, borrado y navegación al mismo nivel que "entrenar hoy" — el diagnóstico de dashboard "sobrecargado" sigue siendo válido, aunque menos crítico que lo que describía el análisis original (ya no falta "próximo entrenamiento" ni "programa activo", eso ya está). Alcance restante: reordenar jerarquía visual (CTA "Entrenar ahora" primero, generar rutina nueva pasa a acción secundaria) y modularizar en componentes (`TodayWorkoutCard`, `WeeklyMetrics`, etc.) — esto último se solapa con la Fase vNext 9.
+- ✅ Reordenada la jerarquía visual de `src/app/page.tsx`: `QuickActions` (CTA "Entrenar") y `SavedRoutines` ahora van primero, justo después de la cuenta/banner de onboarding; `ActiveProgramCard` y `WeeklyMetrics` (sección "Plan"/"Semana") van después; `CoachGenerator` (generar rutina nueva con IA) pasó al final como acción secundaria, tal como pedía el DoD original.
+- ✅ Modularización en componentes ya resuelta en la Fase vNext 9 (`AccountCard`, `ActiveProgramCard`, `WeeklyMetrics`, `QuickActions`, `CoachGenerator`, `SavedRoutines`, `OnboardingBanner`) — no hizo falta trabajo adicional acá.
+- Nota de alcance: no se agregó una tarjeta "próximo entrenamiento" dedicada ni "recomendación del coach" en el Home — no hay todavía un concepto de "entrenamiento programado para hoy" (las rutinas guardadas no tienen día de la semana asociado fuera de un mesociclo) ni una recomendación de una sola línea lista para mostrarse fuera de `/progreso`. Traer la tarjeta de recomendación de la Fase vNext 7 al Home es una extensión natural pero queda fuera de este alcance (reordenar, no añadir una fuente de datos nueva).
 
-## Fase vNext 6 — Modo entrenamiento ultra-rápido
+## Fase vNext 6 — Modo entrenamiento ultra-rápido ✅ (completa, 2026-07-07)
 
-✅ Mayormente cubierto por la Fase 5 de este roadmap (copiar serie anterior, botones rápidos ±2.5 kg/+1 rep, timer de descanso 90s, autoscroll, marcar completado, progreso visual). `ExerciseCard`/`SetLogger`/`RestTimerBanner` ya están extraídos como componentes propios (Fase vNext 9). Resta solo pulido menor no crítico: botón "copiar toda la sesión anterior" (hoy solo copia por ejercicio) y vibración opcional al terminar el descanso.
+- ✅ Base ya cubierta por la Fase 5 de este roadmap (copiar serie anterior, botones rápidos ±2.5 kg/+1 rep, timer de descanso 90s, autoscroll, marcar completado, progreso visual), con `ExerciseCard`/`SetLogger`/`RestTimerBanner` ya extraídos como componentes propios (Fase vNext 9).
+- ✅ Botón "Copiar sesión anterior completa": `aplicarTodasLasSugerencias()` en `useWorkoutSession` aplica de una vez la sugerencia de todos los ejercicios (antes solo existía por ejercicio, uno a la vez).
+- ✅ Vibración al terminar el descanso: `navigator.vibrate` best-effort (no-op silencioso en iOS Safari/desktop, que no lo soportan) — sin necesidad de un toggle propio, ya que el feature-detection lo hace "opcional" en la práctica.
 
 ## Fase vNext 7 — Progreso accionable ✅ (completa, 2026-07-07)
 
@@ -381,9 +385,9 @@ Con esto queda cerrado el bloque P0 completo del roadmap vNext — mergeado a `m
 2. ~~**vNext 8 (resto) — Mesociclos con fases explícitas y deload adaptativo**~~ — ✅ completa (2026-07-07): fases derivadas + multiplicadores en el prompt + sugerencia de deload adaptativo basada en las señales de la Fase 7.
 3. ~~**vNext 10 — Observabilidad IA**~~ — ✅ completa (2026-07-07): tabla `ai_generations` + versionado de prompt/schema + logging en las 3 rutas de IA.
 4. ~~**vNext 12 — Onboarding guiado**~~ — ✅ completa (2026-07-07): wizard en `/onboarding`, reutiliza generación/guardado del dashboard, banner de entrada cuando falta perfil.
-5. **vNext 5/6 (resto) — Reordenar Home y pulido final de UX de gimnasio**, en paralelo con la componentización de 9.
+5. ~~**vNext 5/6 (resto) — Reordenar Home y pulido final de UX de gimnasio**~~ — ✅ completa (2026-07-07): "Entrenar ahora" y rutinas guardadas primero, generar rutina nueva al final; copiar sesión anterior completa; vibración al terminar el descanso.
 
-Con esto quedan 4 de 5 fases del bloque P1 completas. Solo resta el pulido de Home/UX.
+Con esto queda cerrado el bloque P1 completo del roadmap vNext.
 
 **P2 — después**
 

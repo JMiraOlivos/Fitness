@@ -75,6 +75,17 @@ export function useWorkoutSession(routineId: string) {
     return () => clearTimeout(timeout);
   }, [restSecondsLeft]);
 
+  // Best-effort: navigator.vibrate is Android-only (no-op on iOS Safari/desktop),
+  // so this degrades silently where unsupported instead of needing a toggle.
+  useEffect(() => {
+    if (restSecondsLeft !== 0) return;
+    try {
+      navigator.vibrate?.(200);
+    } catch {
+      // ignore — vibration is a nice-to-have, never worth failing the rest timer over
+    }
+  }, [restSecondsLeft]);
+
   const routineExercises = useMemo(() => {
     return [...(routine?.routine_exercises || [])].sort((a, b) => a.order_index - b.order_index);
   }, [routine]);
@@ -183,6 +194,18 @@ export function useWorkoutSession(routineId: string) {
       weight: String(suggestion.suggestedWeight),
       reps: String(suggestion.lastReps),
     });
+  }
+
+  // "Copiar sesión anterior completa" (Fase vNext 6, resto): applies every
+  // exercise's suggestion at once instead of one at a time.
+  function aplicarTodasLasSugerencias() {
+    for (const item of routineExercises) {
+      const exerciseId = one(item.exercises)?.id;
+      const suggestion = exerciseId ? suggestions[exerciseId] : undefined;
+      if (suggestion) {
+        aplicarSugerencia(item.id, suggestion);
+      }
+    }
   }
 
   function copiarSerieAnterior(routineExerciseId: string, ultimaSerie: LocalSetLog) {
@@ -576,6 +599,7 @@ export function useWorkoutSession(routineId: string) {
     exerciseRefs,
     updateInput,
     aplicarSugerencia,
+    aplicarTodasLasSugerencias,
     copiarSerieAnterior,
     ajustarPeso,
     ajustarReps,
