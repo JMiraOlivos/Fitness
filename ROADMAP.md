@@ -144,7 +144,7 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 - ✅ Deduplicación de ejercicios (ya resuelto parcialmente; falta la taxonomía de grupos musculares — ver Fase 8).
 - ✅ Separados ejercicios globales y personalizados: columna `owner_id` nullable en `exercises` (null = global) + RLS actualizada. Sin feature de UI todavía que cree ejercicios personales — cambio preparatorio, no rompe el comportamiento actual (dedup global sigue funcionando, verificado).
 - ✅ Paginación/"cargar más" en `/historial` (antes `.limit(30)`) y en el detalle de ejercicio (antes `.limit(100)`), con `.range()`.
-- ✅ CI (typecheck + lint + build) vía GitHub Actions (`.github/workflows/ci.yml`). Tests unitarios/integración siguen pendientes (ver "Cobertura de tests" más abajo).
+- ✅ CI (typecheck + lint + build) vía GitHub Actions (`.github/workflows/ci.yml`), con tests unitarios y de integración agregados el 2026-07-07 (ver "Cobertura de tests" más abajo).
 - ✅ RLS revisada con casos borde: encontrado y corregido que `workout_logs` no validaba que `routine_id` perteneciera al mismo usuario; documentado (y luego cerrado) que `exercises` permitía insert directo del cliente.
 
 ---
@@ -183,9 +183,9 @@ Este y otros hallazgos de bajo esfuerzo/alto impacto se agrupan en una **Fase 0*
 - ✅ Insight post-entrenamiento con tendencia histórica: ahora incluye hasta 4 sesiones previas por ejercicio (volumen, peso máximo, RPE promedio) además de la sesión de hoy, para poder detectar fatiga/estancamiento real y sugerir deload — cumple lo que la Fase 4 prometía.
 - ✅ Registro de peso corporal / medidas corporales: tabla `body_measurements` nueva + pantalla `/progreso/peso` (peso, % grasa opcional, notas, tendencia vs. registro anterior y vs. el primero).
 - ✅ Sustitución de ejercicio en plena sesión: botón "Sustituir" en `/entrenar/[routineId]` que lista otros ejercicios globales del mismo grupo muscular y actualiza `routine_exercises.exercise_id` (persiste para futuras sesiones de la rutina).
+- ✅ Mesociclos/programas de entrenamiento (2026-07-07): tabla `programs` + columnas nullable `program_id`/`week_number`/`day_of_week`/`is_deload_week` en `routines` (migración `20260710_add_mesociclos.sql`), semanas de deload a cadencia fija con volumen/intensidad reducidos vía ajuste de prompt en `generar-rutina`/`regenerar-dia`, UI mínima en `/programas` (listar, crear, detalle con generación semana a semana) y banner en el dashboard con la semana activa del programa. **Nota:** es deload programado por cadencia fija, no adaptativo por fatiga/rendimiento, y sin fases explícitas de bloque (base/acumulación/intensificación/test) — ver Fase vNext 8 más abajo para el resto del alcance.
 - **Diferido, fuera de este alcance:**
   - Cues técnicos e instrucciones/medios por ejercicio — es esfuerzo de contenido (videos/imágenes/instrucciones reales por ejercicio), no de ingeniería; no hay fuente de contenido para autogenerar esto de forma confiable. El campo `notas` que Gemini ya genera por ejercicio en cada rutina cubre parcialmente esta necesidad hoy.
-  - Mesociclos/programas de entrenamiento con semanas de descarga programadas — el ítem más ambicioso de la fase; el roadmap ya lo marcaba "al final, una vez el resto esté resuelto", y sigue sin un diseño concreto (duración de mesociclo, criterios de deload automático, etc.) que amerite su propia sesión de trabajo dedicada.
 
 ---
 
@@ -217,9 +217,13 @@ Pedido directo del usuario, no estaba en el roadmap original.
 
 ---
 
-## Cobertura de tests
+## Cobertura de tests ✅ (base agregada, 2026-07-07)
 
-Ampliar más allá del esqueleto de CI de la Fase 6: tests unitarios para volumen/1RM/racha y tests de integración para el RPC de guardado de rutinas. Hacerlo después de que el refactor de la Fase 6 se asiente — escribir tests contra código que está por rearquitecturarse es esfuerzo perdido.
+- ✅ Vitest unitario para las funciones puras extraídas a `src/lib/dashboardMetrics.ts` (volumen, racha, formato de etiqueta 1RM) más `oneRepMax.ts`/`supabaseJoins.ts`.
+- ✅ Arnés de integración (`supabase/testing/rpc.integration.test.ts`) que aplica `schema.sql` + todas las migraciones contra un Postgres real (shim mínimo de `auth.uid()`/`auth.users`) para ejercitar `save_ai_routine`/`regenerate_ai_routine_day` y sus checks de ownership, sin depender de la CLI de Supabase ni de un proyecto hosteado.
+- ✅ CI corre ambos: job rápido de unit tests dentro del build existente, y un job nuevo con el servicio nativo de Postgres de GitHub Actions.
+- ⚠️ El job de integración todavía corre con `continue-on-error: true` (primera corrida real contra CI hosteado, no verificable en este sandbox sin egress) — **quitarlo en cuanto se confirme un run verde**, antes de sumarle más peso a ese job. Ver Fase vNext 11.
+- Pendiente: tests E2E (Playwright) del flujo principal — no cubierto todavía.
 
 ## Curación de la librería de ejercicios
 
@@ -232,8 +236,125 @@ Los ejercicios globales (`owner_id is null`, ver Fase 6) se crean solo a través
 1. ~~**Fase 0**~~ — ✅ completa: prompt hardcodeado quitado, docs de auth alineadas, código muerto borrado, migraciones RPC consolidadas, guard de 1RM agregado.
 2. ~~**Fase 6**~~ — ✅ completa: `database.types.ts`, proveedor de sesión, writes críticos movidos a API routes, ejercicios globales/personales separados, paginación, CI, RLS revisada.
 3. ~~**Fase 8 (fundamentos de datos)**~~ — ✅ completa: taxonomía de grupos musculares, flag de calentamiento, perfil persistente wireado a `generar-rutina`, granularidad de RPE.
-4. ~~**Fase 8 (features visibles)**~~ — ✅ mayormente completa: volumen por grupo muscular, sobrecarga progresiva real en generación de rutinas, insight post-entrenamiento con tendencia histórica, registro de peso corporal, sustitución de ejercicio en sesión. Quedan diferidos cues técnicos/contenido (no es trabajo de ingeniería) y mesociclos (el ítem más ambicioso, sin diseño concreto todavía).
+4. ~~**Fase 8 (features visibles)**~~ — ✅ completa: volumen por grupo muscular, sobrecarga progresiva real en generación de rutinas, insight post-entrenamiento con tendencia histórica, registro de peso corporal, sustitución de ejercicio en sesión, mesociclos/programas con deload por cadencia. Queda diferido solo cues técnicos/contenido (no es trabajo de ingeniería).
 5. ~~**Fase 5**~~ — ✅ completa: copiar serie anterior, botones rápidos, timer de descanso, autoscroll, marcar completado, progreso visual de la rutina.
 6. ~~**Fase 7**~~ — ✅ completa: iconos, service worker, modo offline, cache de rutinas guardadas, prompt de instalación propio.
+7. ~~**Cobertura de tests**~~ — ✅ base agregada: unit tests + integración contra Postgres real en CI (queda quitar el `continue-on-error` del job de integración una vez confirmado en verde).
 
-No quedan fases funcionales pendientes en el roadmap. Los únicos ítems abiertos son los diferidos explícitamente de Fase 8: cues técnicos/contenido (esfuerzo de contenido, no de ingeniería) y mesociclos (sin diseño concreto todavía).
+No quedan fases funcionales del roadmap original pendientes. El único ítem abierto de ese roadmap es el diferido explícito de Fase 8 (cues técnicos/contenido — esfuerzo de contenido, no de ingeniería).
+
+Para el siguiente bloque de trabajo, ver **"Roadmap vNext"** más abajo: una revisión externa (2026-07-06) propuso 19 fases nuevas orientadas a calidad de coaching y arquitectura; la sección siguiente las contrasta contra el estado real del repo y prioriza lo que sigue.
+
+---
+
+# Roadmap vNext (contrastado contra el repo, 2026-07-07)
+
+Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fases para llevar la app de "logger con IA" a "coach inteligente". Varias de sus premisas ya estaban desactualizadas respecto al repo real al momento de escribir esto — el análisis no contaba con el trabajo de Fase 8/5/7 (taxonomía, sobrecarga progresiva, tendencia histórica, UX de gimnasio, PWA) ni con el mesociclos + tests agregados el mismo día (`e756a19`). Esta sección revisa cada fase propuesta contra el código/schema actual y deja solo el alcance que sigue siendo un gap real, priorizado.
+
+**Leyenda:** ✅ ya cubierto (no requiere trabajo nuevo) · 🟡 parcial (base existe, falta alcance) · ⬜ pendiente (no existe).
+
+## Fase vNext 0 — Roadmap y QA
+
+🟡 Parcial. Este mismo `ROADMAP.md` ya cumple el rol de "roadmap actualizado que no contradice el estado real" tras esta revisión. Falta únicamente `docs/QA_CHECKLIST.md` con el checklist manual (crear usuario → generar rutina → entrenar → historial → progreso → programas → RLS cruzada) — no existe todavía como documento separado.
+
+## Fase vNext 1 — Prescripción real (RPE/RIR/tempo/descanso/progresión por ejercicio)
+
+⬜ Pendiente, gap real. Verificado en `supabase/schema.sql`: `routine_exercises` solo tiene series/reps/notas — no existen `rest_seconds`, `target_rpe`, `target_rir`, `tempo`, `movement_pattern`, `priority`, `progression_rule` ni `substitution_criteria`. El prompt de `generar-rutina` ya usa perfil + desempeño reciente (Fase 8) pero no fuerza a Gemini a devolver estos campos estructurados. Mantener la propuesta original: migración con las 8 columnas + CHECK constraints (rpe 1-10, rir 0-5, rest 30-600s, priority enum), actualizar `routineSchema` (Zod) y el prompt, UI resumida en la tarjeta de ejercicio durante el entrenamiento. Manejar `null` para rutinas viejas.
+
+## Fase vNext 2 — Motor determinístico de progresión
+
+🟡 Parcial, gap real en la parte que importa. Existe una sugerencia de progresión en `/entrenar/[routineId]/page.tsx` (líneas ~115-129): heurística de 3 tramos sobre RPE promedio (≤7 sube +2.5 kg, ≥9 mantiene, resto mantiene y busca reps). Está **inline en un componente de 1082 líneas, sin tests, y sin distinguir principal/accesorio/aislamiento ni fatiga multi-sesión** — exactamente el problema que describe la propuesta original. Extraer a `src/lib/training/progression.ts` (+ `fatigue.ts`, `deload.ts`) con las reglas por prioridad de ejercicio y tests (`progression.test.ts`) es el gap real; ya hay precedente de este patrón en `dashboardMetrics.ts`/`.test.ts` (agregado en `e756a19`).
+
+## Fase vNext 3 — Readiness y seguridad
+
+⬜ Pendiente, no existe. No hay tabla `readiness_logs` ni modal previo al entrenamiento. Mantener la propuesta: tabla con energía/sueño/dolor articular/tiempo disponible + RLS, modal de ~20s antes de iniciar sesión, reglas de adaptación (reducir volumen si energía+sueño bajos, sustituir ante dolor articular, recortar accesorios si hay poco tiempo) y guardrail de texto libre ante señales de riesgo (dolor agudo, mareo, etc.).
+
+## Fase vNext 4 — Catálogo curado de ejercicios
+
+🟡 Parcial. Ya cubierto (Fase 6/8 de este roadmap): dedup por nombre/músculo/equipo normalizado, taxonomía fija de 12 grupos musculares + 5 tipos de equipo con CHECK constraints (`src/lib/exerciseTaxonomy.ts`), separación `owner_id` global/personal. **No existe** `canonical_name`, `aliases`, `movement_pattern`, `difficulty`, `is_verified`, ni contenido (`instructions`/`safety_notes`/media). Sustitución de ejercicio (ya implementada en Fase 8) hoy solo filtra por `target_muscle` — no por patrón de movimiento ni dificultad. Alcance restante real: aliases + verificación + pantalla `/admin/exercises` para curar duplicados; es esfuerzo alto y de menor urgencia ahora que el dedup automático ya contiene el problema más agudo (contaminación de catálogo).
+
+## Fase vNext 5 — Home orientado a "qué hago hoy"
+
+🟡 Parcial. `src/app/page.tsx` (558 líneas) ya muestra métricas semanales reales, programa activo y rutinas guardadas, pero mezcla generación IA, borrado y navegación al mismo nivel que "entrenar hoy" — el diagnóstico de dashboard "sobrecargado" sigue siendo válido, aunque menos crítico que lo que describía el análisis original (ya no falta "próximo entrenamiento" ni "programa activo", eso ya está). Alcance restante: reordenar jerarquía visual (CTA "Entrenar ahora" primero, generar rutina nueva pasa a acción secundaria) y modularizar en componentes (`TodayWorkoutCard`, `WeeklyMetrics`, etc.) — esto último se solapa con la Fase vNext 9.
+
+## Fase vNext 6 — Modo entrenamiento ultra-rápido
+
+✅ Mayormente cubierto por la Fase 5 de este roadmap (copiar serie anterior, botones rápidos ±2.5 kg/+1 rep, timer de descanso 90s, autoscroll, marcar completado, progreso visual). Resta solo pulido menor no crítico: botón "copiar toda la sesión anterior" (hoy solo copia por ejercicio), vibración opcional al terminar el descanso, y — comparte causa raíz con Fase vNext 9 — extraer `ExerciseCard`/`SetLogger`/`RestTimer` del monolito de 1082 líneas.
+
+## Fase vNext 7 — Progreso accionable
+
+🟡 Parcial. Volumen semanal por grupo muscular ya existe en `/progreso` (Fase 8). **Falta** comparar ese volumen contra un rango objetivo (ej. "Cuádriceps: 6 / 10-16 series - bajo"), vista de fatiga (RPE subiendo + volumen/carga bajando sesión a sesión) y adherencia (planificado vs. completado, ahora que existen `programs`/`week_number` para calcularlo). Tarjeta de recomendación concreta ("qué ajustar esta semana") depende de este cálculo — es una extensión natural del insight con tendencia histórica ya implementado en Fase 8.
+
+## Fase vNext 8 — Mesociclos más inteligentes
+
+🟡 Parcial. **Ya implementado** (`e756a19`, migración `20260710_add_mesociclos.sql`): tabla `programs`, `routines.program_id`/`week_number`/`day_of_week`/`is_deload_week`, deload a cadencia fija con volumen/intensidad reducidos en el prompt, UI en `/programas`. **Falta** el resto del alcance original: fase explícita por semana (base/acumulación/intensificación/deload/test, hoy solo hay "semana normal" vs. "semana deload"), volumen/intensidad objetivo por fase, deload adaptativo por fatiga/adherencia real (hoy es puramente por cadencia N semanas) y que la generación de la siguiente semana use adherencia/fatiga acumulada, no solo la semana anterior.
+
+## Fase vNext 9 — Arquitectura por features
+
+⬜ Pendiente, gap real y ahora más urgente. Verificado: `src/app/entrenar/[routineId]/page.tsx` tiene **1082 líneas**, `src/app/page.tsx` **558 líneas** — ambos mezclan UI, queries a Supabase, estado y reglas de negocio (incluida la heurística de progresión de Fase vNext 2). Mantener la propuesta de `src/features/{workout,dashboard,...}` con `components/hooks/data/domain`; es prerrequisito práctico de las Fases vNext 2, 5 y 6 (no se puede extraer un motor de progresión testeable ni componentizar el dashboard sin antes separar esta lógica del componente de página).
+
+## Fase vNext 10 — Observabilidad y versionado de IA
+
+⬜ Pendiente, no existe. No hay tabla `ai_generations` ni `src/lib/ai/prompts/*.v1.ts` versionados — los prompts viven inline en las rutas API (`generar-rutina`, `regenerar-dia`, `analizar-entrenamiento`). Mantener la propuesta: tabla de log (modelo, prompt/schema version, input/output, latencia, éxito/error) y extracción de prompts a archivos versionados. Valor alto una vez haya más de una versión de prompt en producción (Fase vNext 1 va a forzar la primera).
+
+## Fase vNext 11 — Testing productivo
+
+🟡 Parcial, con progreso real desde la publicación del análisis original. CI ya corre typecheck + lint + unit tests + build + integración contra Postgres real (`e756a19`). **Falta**: quitar `continue-on-error: true` del job de integración (`ci.yml`) en cuanto se confirme un run verde en GitHub Actions real — el sandbox de desarrollo no tiene egress para verificarlo antes de mergear — y agregar E2E con Playwright del flujo principal (signup → generar → guardar → entrenar → registrar serie → finalizar → historial → progreso). Ningún test cubre todavía reglas de dominio fitness (no existen porque el motor de progresión de Fase vNext 2 tampoco existe aún como módulo separado).
+
+## Fase vNext 12 — Onboarding guiado
+
+⬜ Pendiente. `/perfil` existe (Fase 8: `training_goal`/`injury_notes`/`equipment_available`/`experience_level`) pero como formulario, no como wizard de una pregunta por pantalla con progreso visible. Mantener la propuesta tal cual — es una mejora de UX sobre datos que ya se capturan, no requiere schema nuevo.
+
+## Fase vNext 13 — Contenido técnico por ejercicio
+
+⬜ Pendiente — coincide con lo que este roadmap ya marca como diferido en Fase 8 ("esfuerzo de contenido, no de ingeniería"). Sin cambios: sigue siendo baja prioridad hasta tener una fuente de contenido curado confiable.
+
+## Fase vNext 14 — Offline real con sincronización
+
+🟡 Parcial. Ya cubierto (Fase 7): service worker con app-shell caching, `network-first` para navegaciones, `stale-while-revalidate` para assets, cache del GET de rutinas guardadas, fallback offline estático. **Falta** todo lo que requiere escritura offline: cola local (IndexedDB) para registrar series sin conexión, sync automático al reconectar, resolución de conflictos e indicador de estado "pendiente de sincronizar" — hoy la app cachea lectura pero no soporta registrar series sin red.
+
+## Fase vNext 15 — Personalización avanzada
+
+⬜ Pendiente, no existe. No hay tabla `user_exercise_preferences` ni señal de favoritos/ejercicios evitados. Se solapa con Fase vNext 4 (requiere que exista `is_verified`/matching de catálogo para que "sustituye con frecuencia" tenga sentido agregado). Baja prioridad hasta que la Fase vNext 1-2 den suficiente prescripción/progresión real que aprender a preferir.
+
+## Fase vNext 16 — Cardio, movilidad y salud general
+
+⬜ Pendiente, no existe. Coincide con la evaluación del análisis original: expansión opcional, no crítica para el foco actual de fuerza/hipertrofia. Sin cambios de prioridad.
+
+## Fase vNext 17 — Coach IA proactivo
+
+⬜ Pendiente, no existe tabla `coach_recommendations`. El insight post-entrenamiento con tendencia de 4 sesiones (Fase 8) es la base sobre la que esto se construye — sin Fase vNext 7 (progreso accionable con objetivos) esta fase no tiene de dónde sacar sus recomendaciones ("volumen alto en espalda", "no entrenaste piernas") de forma confiable.
+
+## Fase vNext 18 — Admin/calidad de producto
+
+⬜ Pendiente, no existe. Baja prioridad — depende de que exista contenido que curar (Fase vNext 4) y observabilidad de IA que auditar (Fase vNext 10) antes de que una pantalla `/admin` tenga datos reales que mostrar.
+
+---
+
+## Priorización vNext (P0/P1/P2)
+
+Reordenado desde la matriz del análisis original, con lo ya cubierto (Fases 6/8/vNext 6/8/11 parciales) descontado del esfuerzo restante.
+
+**P0 — siguiente bloque de trabajo**
+
+1. **vNext 9 — Arquitectura por features.** Prerrequisito real de 2, 5 y 6; los dos archivos más grandes del repo (1082 y 558 líneas) ya mezclan lo que las fases 1-2 necesitan separado.
+2. **vNext 1 — Prescripción real.** Gap de coaching de mayor impacto; schema/prompt/UI bien acotados.
+3. **vNext 2 — Motor de progresión.** Extraer la heurística ya existente a `lib/training/` con tests; se apoya en 9 y en los campos nuevos de 1.
+4. **vNext 3 — Readiness.** Gap de seguridad/personalización diario, esfuerzo medio, tabla + modal + reglas.
+5. **vNext 11 (resto) — Quitar `continue-on-error` de integración + E2E.** Ya con la base puesta, es cerrar el loop de calidad, no construirlo desde cero.
+
+**P1 — siguiente**
+
+1. **vNext 7 — Progreso accionable** (volumen vs. objetivo, fatiga, adherencia, recomendación).
+2. **vNext 8 (resto) — Mesociclos con fases explícitas y deload adaptativo.**
+3. **vNext 10 — Observabilidad IA**, sobre todo una vez Fase vNext 1 introduzca una v2 de schema/prompt que valga la pena versionar y comparar.
+4. **vNext 12 — Onboarding guiado.**
+5. **vNext 5/6 (resto) — Reordenar Home y pulido final de UX de gimnasio**, en paralelo con la componentización de 9.
+
+**P2 — después**
+
+1. **vNext 4 (resto) — Aliases, verificación y `/admin/exercises`.**
+2. **vNext 14 (resto) — Cola offline + sync de series.**
+3. **vNext 15 — Personalización avanzada.**
+4. **vNext 17 — Coach IA proactivo.**
+5. **vNext 13, 16, 18 — Contenido técnico, cardio/movilidad, admin.** Sin cambios respecto al análisis original: baja urgencia.
