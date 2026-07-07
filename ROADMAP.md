@@ -222,7 +222,7 @@ Pedido directo del usuario, no estaba en el roadmap original.
 - ✅ Vitest unitario para las funciones puras extraídas a `src/lib/dashboardMetrics.ts` (volumen, racha, formato de etiqueta 1RM) más `oneRepMax.ts`/`supabaseJoins.ts`.
 - ✅ Arnés de integración (`supabase/testing/rpc.integration.test.ts`) que aplica `schema.sql` + todas las migraciones contra un Postgres real (shim mínimo de `auth.uid()`/`auth.users`) para ejercitar `save_ai_routine`/`regenerate_ai_routine_day` y sus checks de ownership, sin depender de la CLI de Supabase ni de un proyecto hosteado.
 - ✅ CI corre ambos: job rápido de unit tests dentro del build existente, y un job nuevo con el servicio nativo de Postgres de GitHub Actions.
-- ⚠️ El job de integración todavía corre con `continue-on-error: true` (primera corrida real contra CI hosteado, no verificable en este sandbox sin egress) — **quitarlo en cuanto se confirme un run verde**, antes de sumarle más peso a ese job. Ver Fase vNext 11.
+- ✅ El job de integración ya no corre con `continue-on-error: true` (2026-07-07): confirmado en verde dos veces en GitHub Actions real antes de quitarlo. Ver Fase vNext 11.
 - Pendiente: tests E2E (Playwright) del flujo principal — no cubierto todavía.
 
 ## Curación de la librería de ejercicios
@@ -310,9 +310,12 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 
 ⬜ Pendiente, no existe. No hay tabla `ai_generations` ni `src/lib/ai/prompts/*.v1.ts` versionados — los prompts viven inline en las rutas API (`generar-rutina`, `regenerar-dia`, `analizar-entrenamiento`). Mantener la propuesta: tabla de log (modelo, prompt/schema version, input/output, latencia, éxito/error) y extracción de prompts a archivos versionados. Valor alto una vez haya más de una versión de prompt en producción (Fase vNext 1 va a forzar la primera).
 
-## Fase vNext 11 — Testing productivo
+## Fase vNext 11 — Testing productivo 🟡 (gate de integración cerrado, 2026-07-07)
 
-🟡 Parcial, con progreso real desde la publicación del análisis original. CI ya corre typecheck + lint + unit tests + build + integración contra Postgres real (`e756a19`). **Falta**: quitar `continue-on-error: true` del job de integración (`ci.yml`) en cuanto se confirme un run verde en GitHub Actions real — el sandbox de desarrollo no tiene egress para verificarlo antes de mergear — y agregar E2E con Playwright del flujo principal (signup → generar → guardar → entrenar → registrar serie → finalizar → historial → progreso). Ningún test cubre todavía reglas de dominio fitness (no existen porque el motor de progresión de Fase vNext 2 tampoco existe aún como módulo separado).
+- ✅ CI corre typecheck + lint + unit tests + build + integración contra Postgres real (`e756a19`).
+- ✅ Quitado `continue-on-error: true` del job de integración en `ci.yml`: confirmado en verde en GitHub Actions real dos veces consecutivas (PR #4, runs `28840785343` y `28841351223`) antes de sacarlo — el job ahora bloquea el merge si falla.
+- ✅ Ya hay cobertura de reglas de dominio fitness: `progression.test.ts` (9), `readiness.test.ts` (8), `workoutMetrics.test.ts` (7) — resuelto junto con las Fases vNext 1-2-9, que es donde ese motor terminó viviendo.
+- **Falta**: tests E2E con Playwright del flujo principal (signup → generar → guardar → entrenar → registrar serie → finalizar → historial → progreso). Sin este entorno de sandbox pudiendo levantar un proyecto Supabase real, un E2E tendría que correr contra el mismo Postgres local + shim de auth que ya usa `rpc.integration.test.ts`, o esperar a tener un proyecto de staging — queda para cuando eso exista.
 
 ## Fase vNext 12 — Onboarding guiado
 
@@ -354,7 +357,7 @@ Reordenado desde la matriz del análisis original, con lo ya cubierto (Fases 6/8
 2. ~~**vNext 1 — Prescripción real**~~ — ✅ completa (2026-07-07): migración + prompts + RPCs + UI. Cierra el loop con la 2 (`priority` real en vez de asumida).
 3. ~~**vNext 3 — Readiness**~~ — ✅ completa (2026-07-07): tabla + RLS + reglas de adaptación testeadas + modal.
 4. ~~**vNext 9 — Arquitectura por features**~~ — ✅ completa (2026-07-07): `src/features/{workout,dashboard}/` con `types/domain/data/hooks/components`. `/entrenar/[routineId]/page.tsx` 1345→231 líneas, `/app/page.tsx` 558→64 líneas.
-5. **vNext 11 (resto) — Quitar `continue-on-error` de integración + E2E.** Bloqueada sin un PR real: `ci.yml` solo corre en push a `main` o en `pull_request`, y no hay forma de confirmar un run verde en GitHub Actions sin abrir uno.
+5. ~~**vNext 11 — Quitar `continue-on-error` de integración**~~ — ✅ completo (2026-07-07): confirmado en verde dos veces en GitHub Actions real (PR #4) antes de quitarlo. Queda pendiente solo el E2E con Playwright, sin bloquear nada del bloque P0.
 
 Con esto queda cerrado el bloque P0 completo del roadmap vNext.
 
