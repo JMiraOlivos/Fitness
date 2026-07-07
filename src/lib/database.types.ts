@@ -420,6 +420,59 @@ export type Database = {
           },
         ];
       };
+      ai_generations: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          type: string;
+          model: string;
+          prompt_version: string;
+          schema_version: string;
+          input: Json | null;
+          output: Json | null;
+          latency_ms: number | null;
+          success: boolean;
+          error: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          type: string;
+          model: string;
+          prompt_version: string;
+          schema_version: string;
+          input?: Json | null;
+          output?: Json | null;
+          latency_ms?: number | null;
+          success?: boolean;
+          error?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          type?: string;
+          model?: string;
+          prompt_version?: string;
+          schema_version?: string;
+          input?: Json | null;
+          output?: Json | null;
+          latency_ms?: number | null;
+          success?: boolean;
+          error?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_generations_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: {

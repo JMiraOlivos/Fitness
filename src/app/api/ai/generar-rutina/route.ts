@@ -5,6 +5,7 @@ import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from '@/lib/exerciseTaxonomy';
 import { EXERCISE_PRIORITIES, MOVEMENT_PATTERNS } from '@/lib/training/prescriptionTaxonomy';
 import { MESOCYCLE_PHASE_TARGETS, type MesocyclePhase } from '@/lib/training/mesocycle';
 import { getOptionalUserProfile, getRecentPerformanceSummary, resolveOptionalAuth } from '@/lib/supabaseServer';
+import { logAiGeneration } from '@/lib/ai/logGeneration';
 
 export const runtime = 'edge';
 
@@ -44,6 +45,10 @@ const rutinaSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  let auth: Awaited<ReturnType<typeof resolveOptionalAuth>> = null;
+  let requestBody: unknown = null;
+  const startedAt = Date.now();
+
   try {
     if (!apiKey) {
       return Response.json(
@@ -70,11 +75,12 @@ export async function POST(req: Request) {
         fase: MesocyclePhase;
       };
     } = await req.json();
+    requestBody = { restricciones, diasDisponibles, enfoque, programaContexto };
     const google = createGoogleGenerativeAI({ apiKey });
 
     // Best-effort: an anonymous or invalid-token caller still gets a routine generated
     // exactly as before, just without profile/history personalization.
-    const auth = await resolveOptionalAuth(req);
+    auth = await resolveOptionalAuth(req);
     const profile = await getOptionalUserProfile(auth);
     const recentPerformance = await getRecentPerformanceSummary(auth);
 
@@ -130,9 +136,31 @@ export async function POST(req: Request) {
       schema: rutinaSchema,
     });
 
+    await logAiGeneration({
+      supabase: auth?.supabase ?? null,
+      userId: auth?.user.id ?? null,
+      type: 'routine_generation',
+      input: requestBody,
+      output: result.object,
+      latencyMs: Date.now() - startedAt,
+      success: true,
+    });
+
     return Response.json(result.object);
   } catch (error) {
     console.error('Error generando la rutina con Gemini:', error);
+
+    await logAiGeneration({
+      supabase: auth?.supabase ?? null,
+      userId: auth?.user.id ?? null,
+      type: 'routine_generation',
+      input: requestBody,
+      output: null,
+      latencyMs: Date.now() - startedAt,
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
+    });
+
     return Response.json({ error: 'Fallo al procesar la solicitud de IA' }, { status: 500 });
   }
 }

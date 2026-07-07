@@ -314,9 +314,12 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 - Verificación: `tsc`/lint/build limpios, 50 tests unitarios y 13 de integración sin regresiones, y renderizado manual en navegador (Playwright contra el dev server) de ambas páginas sin errores de consola — el repo no tiene React Testing Library, así que no se agregaron tests de componente, solo de la lógica de dominio ya extraída (mismo patrón que `dashboardMetrics.test.ts`).
 - No se pudo ejercitar el flujo autenticado completo (login real, registrar serie, etc.) por el mismo bloqueo de egress a Supabase que afecta al resto del repo — verificado el estado no-autenticado de ambas páginas y el comportamiento vía revisión de código 1:1 contra el componente original.
 
-## Fase vNext 10 — Observabilidad y versionado de IA
+## Fase vNext 10 — Observabilidad y versionado de IA ✅ (completa, 2026-07-07)
 
-⬜ Pendiente, no existe. No hay tabla `ai_generations` ni `src/lib/ai/prompts/*.v1.ts` versionados — los prompts viven inline en las rutas API (`generar-rutina`, `regenerar-dia`, `analizar-entrenamiento`). Mantener la propuesta: tabla de log (modelo, prompt/schema version, input/output, latencia, éxito/error) y extracción de prompts a archivos versionados. Valor alto una vez haya más de una versión de prompt en producción (Fase vNext 1 va a forzar la primera).
+- ✅ Migración `20260714_add_ai_generations.sql`: tabla `ai_generations` (tipo, modelo, prompt/schema version, input/output jsonb, latencia, éxito/error) con RLS (select/insert propios), `type` restringido por CHECK a los 3 valores que existen hoy (`routine_generation`, `routine_regeneration`, `workout_insight`) — ampliar el CHECK cuando se implementen los demás tipos del roadmap original (`program_week_generation`, `exercise_substitution`, `coach_recommendation`). Cubierta con 4 tests de integración de RLS.
+- ✅ `src/lib/ai/promptVersions.ts`: versión de prompt/schema centralizada por tipo de generación (no se extrajeron los prompts a archivos separados por versión como proponía el análisis original — el valor real pedido era trazabilidad/comparación, no modularizar el texto del prompt; los 3 prompts ya eran razonablemente cortos y extraerlos habría sido riesgo sin beneficio claro).
+- ✅ `src/lib/ai/logGeneration.ts`: `logAiGeneration()` best-effort (nunca rompe la ruta si falla el insert), integrado en las 3 rutas de IA (`generar-rutina`, `regenerar-dia`, `analizar-entrenamiento`), midiendo latencia real y registrando tanto éxito como error. Solo registra para llamadas autenticadas — las anónimas no tienen `user_id` para asociar el log, mismo criterio que `getOptionalUserProfile`/`getRecentPerformanceSummary`.
+- Nota de alcance: no hay pantalla `/admin/ai` todavía para consultar estos logs (ver Fase vNext 18) — por ahora son consultables directo en la base.
 
 ## Fase vNext 11 — Testing productivo 🟡 (gate de integración cerrado, 2026-07-07)
 
@@ -373,7 +376,7 @@ Con esto queda cerrado el bloque P0 completo del roadmap vNext — mergeado a `m
 
 1. ~~**vNext 7 — Progreso accionable**~~ — ✅ completa (2026-07-07): volumen vs. objetivo, fatiga multi-sesión, adherencia y tarjeta de recomendación en `/progreso`.
 2. ~~**vNext 8 (resto) — Mesociclos con fases explícitas y deload adaptativo**~~ — ✅ completa (2026-07-07): fases derivadas + multiplicadores en el prompt + sugerencia de deload adaptativo basada en las señales de la Fase 7.
-3. **vNext 10 — Observabilidad IA**, sobre todo una vez Fase vNext 1 introduzca una v2 de schema/prompt que valga la pena versionar y comparar.
+3. ~~**vNext 10 — Observabilidad IA**~~ — ✅ completa (2026-07-07): tabla `ai_generations` + versionado de prompt/schema + logging en las 3 rutas de IA.
 4. **vNext 12 — Onboarding guiado.**
 5. **vNext 5/6 (resto) — Reordenar Home y pulido final de UX de gimnasio**, en paralelo con la componentización de 9.
 

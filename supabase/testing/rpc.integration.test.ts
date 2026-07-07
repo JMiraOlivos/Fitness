@@ -334,3 +334,69 @@ describe("readiness_logs RLS", () => {
     expect(rows).toHaveLength(0);
   });
 });
+
+describe("ai_generations RLS", () => {
+  it("lets a user insert and read their own generation log", async () => {
+    const userId = await createUser("ai-owner@example.com");
+
+    const logId = await asUser(userId, async () => {
+      const { rows } = await client.query<{ id: string }>(
+        `insert into public.ai_generations (user_id, type, model, prompt_version, schema_version, input, output, latency_ms, success)
+         values ($1, 'routine_generation', 'gemini-2.5-flash', 'v2', 'v2', '{"enfoque":"Hipertrofia"}', '{"rutinas":[]}', 850, true)
+         returning id`,
+        [userId]
+      );
+      return rows[0].id;
+    });
+
+    const { rows } = await asUser(userId, () => client.query("select type, success, latency_ms from public.ai_generations where id = $1", [logId]));
+    expect(rows[0].type).toBe("routine_generation");
+    expect(rows[0].success).toBe(true);
+    expect(rows[0].latency_ms).toBe(850);
+  });
+
+  it("rejects an unrecognized generation type", async () => {
+    const userId = await createUser("ai-bad-type@example.com");
+
+    await expect(
+      asUser(userId, () =>
+        client.query(
+          `insert into public.ai_generations (user_id, type, model, prompt_version, schema_version, success)
+           values ($1, 'something_else', 'gemini-2.5-flash', 'v1', 'v1', true)`,
+          [userId]
+        )
+      )
+    ).rejects.toThrow();
+  });
+
+  it("rejects inserting a generation log under another user's id", async () => {
+    const userId = await createUser("ai-user@example.com");
+    const otherUserId = await createUser("ai-other@example.com");
+
+    await expect(
+      asUser(userId, () =>
+        client.query(
+          `insert into public.ai_generations (user_id, type, model, prompt_version, schema_version, success)
+           values ($1, 'workout_insight', 'gemini-2.5-flash', 'v1', 'v1', true)`,
+          [otherUserId]
+        )
+      )
+    ).rejects.toThrow();
+  });
+
+  it("does not let a user read another user's generation log", async () => {
+    const ownerId = await createUser("ai-owner2@example.com");
+    const intruderId = await createUser("ai-intruder@example.com");
+
+    await asUser(ownerId, () =>
+      client.query(
+        `insert into public.ai_generations (user_id, type, model, prompt_version, schema_version, success)
+         values ($1, 'workout_insight', 'gemini-2.5-flash', 'v1', 'v1', true)`,
+        [ownerId]
+      )
+    );
+
+    const { rows } = await asUser(intruderId, () => client.query("select * from public.ai_generations where user_id = $1", [ownerId]));
+    expect(rows).toHaveLength(0);
+  });
+});
