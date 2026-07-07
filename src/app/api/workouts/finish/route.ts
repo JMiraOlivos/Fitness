@@ -15,6 +15,16 @@ export async function POST(req: Request) {
     return Response.json({ error: "Falta el entrenamiento a finalizar." }, { status: 400 });
   }
 
+  const { data: existing } = await auth.supabase
+    .from("workout_logs")
+    .select("end_time")
+    .eq("id", workoutLogId)
+    .maybeSingle();
+
+  if (existing?.end_time) {
+    return Response.json({ ok: true });
+  }
+
   const { error } = await auth.supabase
     .from("workout_logs")
     .update({

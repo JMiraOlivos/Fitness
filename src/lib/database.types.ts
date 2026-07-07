@@ -261,6 +261,7 @@ export type Database = {
           start_time: string;
           end_time: string | null;
           ai_insight: string | null;
+          client_operation_id: string | null;
         };
         Insert: {
           id?: string;
@@ -269,6 +270,7 @@ export type Database = {
           start_time?: string;
           end_time?: string | null;
           ai_insight?: string | null;
+          client_operation_id?: string | null;
         };
         Update: {
           id?: string;
@@ -277,6 +279,7 @@ export type Database = {
           start_time?: string;
           end_time?: string | null;
           ai_insight?: string | null;
+          client_operation_id?: string | null;
         };
         Relationships: [
           {
@@ -306,6 +309,7 @@ export type Database = {
           rpe: number | null;
           is_warmup: boolean;
           created_at: string;
+          client_operation_id: string | null;
         };
         Insert: {
           id?: string;
@@ -317,6 +321,7 @@ export type Database = {
           rpe?: number | null;
           is_warmup?: boolean;
           created_at?: string;
+          client_operation_id?: string | null;
         };
         Update: {
           id?: string;
@@ -328,6 +333,7 @@ export type Database = {
           rpe?: number | null;
           is_warmup?: boolean;
           created_at?: string;
+          client_operation_id?: string | null;
         };
         Relationships: [
           {
@@ -396,6 +402,7 @@ export type Database = {
           available_minutes: number | null;
           notes: string | null;
           created_at: string;
+          client_operation_id: string | null;
         };
         Insert: {
           id?: string;
@@ -408,6 +415,7 @@ export type Database = {
           available_minutes?: number | null;
           notes?: string | null;
           created_at?: string;
+          client_operation_id?: string | null;
         };
         Update: {
           id?: string;
@@ -420,6 +428,7 @@ export type Database = {
           available_minutes?: number | null;
           notes?: string | null;
           created_at?: string;
+          client_operation_id?: string | null;
         };
         Relationships: [
           {

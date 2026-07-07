@@ -10,6 +10,7 @@ import { ExerciseCard } from "@/features/workout/components/ExerciseCard";
 import { ReadinessModal } from "@/features/workout/components/ReadinessModal";
 import { RegeneratePanel } from "@/features/workout/components/RegeneratePanel";
 import { RestTimerBanner } from "@/features/workout/components/RestTimerBanner";
+import { OfflineBanner } from "@/components/OfflineBanner";
 
 export default function EntrenarPage() {
   const params = useParams<{ routineId: string }>();
@@ -124,6 +125,10 @@ export default function EntrenarPage() {
       {session.restSecondsLeft !== null && (
         <RestTimerBanner secondsLeft={session.restSecondsLeft} onDismiss={() => session.setRestSecondsLeft(null)} />
       )}
+
+      <div className="mb-6">
+        <OfflineBanner />
+      </div>
 
       <section className="grid grid-cols-2 gap-4 mb-6">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">

@@ -3,6 +3,7 @@ import { AppNavigation } from "@/components/AppNavigation";
 import { SessionProvider } from "@/components/SessionProvider";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { SyncInitializer } from "@/components/SyncInitializer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body className="bg-black antialiased">
         <ServiceWorkerRegistration />
+        <SyncInitializer />
         <SessionProvider>
           {children}
           <InstallPrompt />

@@ -22,6 +22,14 @@ import {
   startWorkout,
   substituteExercise,
 } from "../data/workoutMutations";
+import {
+  enqueueStartWorkout,
+  enqueueLogSet,
+  enqueueFinishWorkout,
+  enqueueSubstituteExercise,
+  enqueueReadinessLog,
+} from "@/lib/offline/queue";
+import { useConnectivity } from "@/lib/offline/useConnectivity";
 import type {
   ExercisePriority,
   ExerciseRow,
@@ -64,6 +72,8 @@ export function useWorkoutSession(routineId: string) {
   const [readinessForm, setReadinessForm] = useState<ReadinessForm>(defaultReadinessForm());
   const [readinessGuidance, setReadinessGuidance] = useState<ReadinessGuidance | null>(null);
   const exerciseRefs = useRef<Record<string, HTMLElement | null>>({});
+  const { isOnline } = useConnectivity();
+  const [pendingSetIds, setPendingSetIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (restSecondsLeft === null || restSecondsLeft <= 0) return;
@@ -297,11 +307,8 @@ export function useWorkoutSession(routineId: string) {
 
     const { error: updateError } = await substituteExercise(item.id, nuevoEjercicio.id);
 
-    setIsSubstituting(false);
-
     if (updateError) {
-      setError(updateError.message);
-      return;
+      enqueueSubstituteExercise(item.id, nuevoEjercicio.id);
     }
 
     setRoutine((current) => {
@@ -317,6 +324,7 @@ export function useWorkoutSession(routineId: string) {
 
     setSuccessMessage(`${one(item.exercises)?.name || "Ejercicio"} sustituido por ${nuevoEjercicio.name}.`);
     cerrarSustitucion();
+    setIsSubstituting(false);
   }
 
   async function regenerarDia() {
@@ -357,19 +365,23 @@ export function useWorkoutSession(routineId: string) {
 
     setIsStarting(true);
 
-    let data: { id: string; startTime: string | null };
-
     try {
-      data = await startWorkout(routine.id);
+      try {
+        const data = await startWorkout(routine.id);
+        setWorkoutLogId(data.id);
+        setStartTime(data.startTime ? new Date(data.startTime) : new Date());
+        setSuccessMessage("Entrenamiento iniciado.");
+        return data.id;
+      } catch {
+        const { tempWorkoutLogId } = enqueueStartWorkout(routine.id);
+        setWorkoutLogId(tempWorkoutLogId);
+        setStartTime(new Date());
+        setSuccessMessage("Entrenamiento iniciado (offline).");
+        return tempWorkoutLogId;
+      }
     } finally {
       setIsStarting(false);
     }
-
-    setWorkoutLogId(data.id);
-    setStartTime(data.startTime ? new Date(data.startTime) : new Date());
-    setSuccessMessage("Entrenamiento iniciado.");
-
-    return data.id;
   }
 
   async function iniciarConReadiness(shouldAdapt: boolean) {
@@ -393,11 +405,8 @@ export function useWorkoutSession(routineId: string) {
 
       if (shouldAdapt && user) {
         const { error: readinessError } = await saveReadinessLog({ userId: user.id, workoutLogId: logId, form: readinessForm });
-
-        // Best-effort: a failed readiness log shouldn't block the workout that's
-        // already started — the on-screen guidance was computed client-side anyway.
         if (readinessError) {
-          console.error("No se pudo guardar el readiness check-in:", readinessError.message);
+          enqueueReadinessLog({ userId: user.id, workoutLogId: logId, form: readinessForm as unknown as Record<string, unknown> });
         }
       }
     } catch (err) {
@@ -438,24 +447,52 @@ export function useWorkoutSession(routineId: string) {
       const logId = await ensureWorkoutLog();
       const setNumber = (setLogs[exercise.id]?.length || 0) + 1;
 
-      const data = await logSet({
-        workoutLogId: logId,
-        exerciseId: exercise.id,
-        setNumber,
-        weight,
-        reps,
-        rpe,
-        isWarmup,
-      });
+      let savedSet: LocalSetLog;
+      let wasOffline = false;
 
-      const savedSet: LocalSetLog = {
-        id: data.id,
-        set_number: Number(data.set_number),
-        weight: Number(data.weight),
-        reps: Number(data.reps),
-        rpe: data.rpe === null ? null : Number(data.rpe),
-        is_warmup: Boolean(data.is_warmup),
-      };
+      try {
+        const data = await logSet({
+          workoutLogId: logId,
+          exerciseId: exercise.id,
+          setNumber,
+          weight,
+          reps,
+          rpe,
+          isWarmup,
+        });
+
+        savedSet = {
+          id: data.id,
+          set_number: Number(data.set_number),
+          weight: Number(data.weight),
+          reps: Number(data.reps),
+          rpe: data.rpe === null ? null : Number(data.rpe),
+          is_warmup: Boolean(data.is_warmup),
+        };
+      } catch {
+        const { tempSetId } = enqueueLogSet({
+          workoutLogId: logId,
+          exerciseId: exercise.id,
+          setNumber,
+          weight,
+          reps,
+          rpe,
+          isWarmup,
+        });
+
+        savedSet = {
+          id: tempSetId,
+          set_number: setNumber,
+          weight,
+          reps,
+          rpe,
+          is_warmup: isWarmup,
+          pending: true,
+        };
+
+        setPendingSetIds((current) => new Set(current).add(tempSetId));
+        wasOffline = true;
+      }
 
       setSetLogs((current) => ({
         ...current,
@@ -471,7 +508,7 @@ export function useWorkoutSession(routineId: string) {
         },
       }));
 
-      setSuccessMessage(`Serie ${setNumber} registrada para ${exercise.name}.`);
+      setSuccessMessage(`Serie ${setNumber} registrada para ${exercise.name}${wasOffline ? " (sin conexión)" : ""}.`);
       setRestSecondsLeft(REST_DURATION_SECONDS);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo registrar la serie.");
@@ -541,7 +578,6 @@ export function useWorkoutSession(routineId: string) {
 
     const allLoggedSets = Object.values(setLogs).flat();
     const totalSets = allLoggedSets.filter((log) => !log.is_warmup).length;
-    const totalVolume = Object.values(setLogs).reduce((sum, logs) => sum + getVolume(logs), 0);
 
     if (allLoggedSets.length === 0) {
       setIsFinishing(false);
@@ -549,18 +585,33 @@ export function useWorkoutSession(routineId: string) {
       return;
     }
 
-    const aiInsight = await generarInsightEntrenamiento(totalSets, totalVolume);
+    const isRealWorkoutLog = !workoutLogId.startsWith("local-");
+    const totalVolume = Object.values(setLogs).reduce((sum, logs) => sum + getVolume(logs), 0);
+
+    let aiInsight: string;
+
+    if (isRealWorkoutLog && pendingSetIds.size === 0) {
+      aiInsight = await generarInsightEntrenamiento(totalSets, totalVolume);
+    } else {
+      aiInsight = [
+        `Entrenamiento finalizado con ${totalSets} series y ${Math.round(totalVolume)} kg de volumen total.`,
+        pendingSetIds.size > 0 ? `${pendingSetIds.size} ${pendingSetIds.size === 1 ? "serie pendiente" : "series pendientes"} de sincronizar.` : null,
+      ].filter(Boolean).join(" ");
+    }
 
     try {
       await finishWorkout(workoutLogId, aiInsight);
-    } catch (err) {
-      setIsFinishing(false);
-      setError(err instanceof Error ? err.message : "No se pudo finalizar el entrenamiento.");
-      return;
+    } catch {
+      enqueueFinishWorkout(workoutLogId, aiInsight);
     }
 
     setIsFinishing(false);
-    router.push(`/historial/${workoutLogId}`);
+
+    if (isRealWorkoutLog) {
+      router.push(`/historial/${workoutLogId}`);
+    } else {
+      router.push("/historial");
+    }
   }
 
   return {
@@ -611,6 +662,9 @@ export function useWorkoutSession(routineId: string) {
     iniciarConReadiness,
     registrarSerie,
     finalizarEntrenamiento,
+    isOnline,
+    pendingSetIds,
+    hasPendingOps: pendingSetIds.size > 0,
   };
 }
 

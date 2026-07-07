@@ -45,6 +45,7 @@ export type LocalSetLog = {
   reps: number;
   rpe: number | null;
   is_warmup: boolean;
+  pending?: boolean;
 };
 
 export type WorkoutInsightResponse = {

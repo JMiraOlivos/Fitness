@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dumbbell, History, Home, TrendingUp } from "lucide-react";
+import { CloudOff, Dumbbell, History, Home, TrendingUp } from "lucide-react";
+import { useConnectivity } from "@/lib/offline/useConnectivity";
 
 const navItems = [
   { href: "/", label: "Inicio", icon: Home },
@@ -17,6 +18,7 @@ function isActive(pathname: string, href: string) {
 
 export function AppNavigation() {
   const pathname = usePathname();
+  const { isOnline, pendingCount } = useConnectivity();
 
   if (pathname.startsWith("/auth")) return null;
 
@@ -33,6 +35,12 @@ export function AppNavigation() {
           </Link>
         );
       })}
+      {!isOnline && (
+        <span className="flex flex-col items-center gap-1 text-amber-500 font-bold" title="Sin conexión">
+          <CloudOff className="h-5 w-5" />
+          <span className="text-[9px]">{pendingCount > 0 ? pendingCount : "Off"}</span>
+        </span>
+      )}
     </nav>
   );
 }

@@ -10,8 +10,9 @@ export async function saveReadinessLog(params: {
   userId: string;
   workoutLogId: string;
   form: ReadinessForm;
+  clientOperationId?: string;
 }) {
-  const { userId, workoutLogId, form } = params;
+  const { userId, workoutLogId, form, clientOperationId } = params;
 
   return supabase.from("readiness_logs").insert({
     user_id: userId,
@@ -22,11 +23,12 @@ export async function saveReadinessLog(params: {
     joint_pain: form.jointPain,
     available_minutes: form.availableMinutes,
     notes: form.notes || null,
+    client_operation_id: clientOperationId ?? null,
   });
 }
 
-export async function startWorkout(routineId: string) {
-  return authFetch<{ id: string; startTime: string | null }>("/api/workouts/start", { routineId });
+export async function startWorkout(routineId: string, clientOperationId?: string) {
+  return authFetch<{ id: string; startTime: string | null }>("/api/workouts/start", { routineId, clientOperationId });
 }
 
 export async function logSet(params: {
@@ -37,6 +39,7 @@ export async function logSet(params: {
   reps: number;
   rpe: number | null;
   isWarmup: boolean;
+  clientOperationId?: string;
 }) {
   return authFetch<{ id: string; set_number: number; weight: number; reps: number; rpe: number | null; is_warmup: boolean }>(
     "/api/workouts/log-set",

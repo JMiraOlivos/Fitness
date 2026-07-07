@@ -1,4 +1,4 @@
-import { CheckCircle, Dumbbell, Repeat, Sparkles } from "lucide-react";
+import { CheckCircle, Clock, Dumbbell, Repeat, Sparkles } from "lucide-react";
 import { formatRelativeDate, formatRestTime, PRIORITY_LABELS } from "../domain/workoutMetrics";
 import { SetLogger } from "./SetLogger";
 import { SubstitutionPanel } from "./SubstitutionPanel";
@@ -186,6 +186,7 @@ export function ExerciseCard({
                 Serie {log.set_number} {log.is_warmup && <span className="text-[#CCFF00]">· Calentamiento</span>}
               </span>
               <span className="font-bold text-white">
+                {log.pending && <Clock className="inline h-3 w-3 mr-1 text-amber-400" />}
                 {log.weight} kg × {log.reps} reps {log.rpe ? `• RPE ${log.rpe}` : ""}
               </span>
             </div>
