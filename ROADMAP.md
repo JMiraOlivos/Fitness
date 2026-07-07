@@ -289,7 +289,7 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 
 ## Fase vNext 6 — Modo entrenamiento ultra-rápido
 
-✅ Mayormente cubierto por la Fase 5 de este roadmap (copiar serie anterior, botones rápidos ±2.5 kg/+1 rep, timer de descanso 90s, autoscroll, marcar completado, progreso visual). Resta solo pulido menor no crítico: botón "copiar toda la sesión anterior" (hoy solo copia por ejercicio), vibración opcional al terminar el descanso, y — comparte causa raíz con Fase vNext 9 — extraer `ExerciseCard`/`SetLogger`/`RestTimer` del monolito de 1082 líneas.
+✅ Mayormente cubierto por la Fase 5 de este roadmap (copiar serie anterior, botones rápidos ±2.5 kg/+1 rep, timer de descanso 90s, autoscroll, marcar completado, progreso visual). `ExerciseCard`/`SetLogger`/`RestTimerBanner` ya están extraídos como componentes propios (Fase vNext 9). Resta solo pulido menor no crítico: botón "copiar toda la sesión anterior" (hoy solo copia por ejercicio) y vibración opcional al terminar el descanso.
 
 ## Fase vNext 7 — Progreso accionable
 
@@ -299,9 +299,12 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 
 🟡 Parcial. **Ya implementado** (`e756a19`, migración `20260710_add_mesociclos.sql`): tabla `programs`, `routines.program_id`/`week_number`/`day_of_week`/`is_deload_week`, deload a cadencia fija con volumen/intensidad reducidos en el prompt, UI en `/programas`. **Falta** el resto del alcance original: fase explícita por semana (base/acumulación/intensificación/deload/test, hoy solo hay "semana normal" vs. "semana deload"), volumen/intensidad objetivo por fase, deload adaptativo por fatiga/adherencia real (hoy es puramente por cadencia N semanas) y que la generación de la siguiente semana use adherencia/fatiga acumulada, no solo la semana anterior.
 
-## Fase vNext 9 — Arquitectura por features
+## Fase vNext 9 — Arquitectura por features ✅ (completa, 2026-07-07)
 
-⬜ Pendiente, gap real y ahora más urgente. Verificado: `src/app/entrenar/[routineId]/page.tsx` tiene **1082 líneas**, `src/app/page.tsx` **558 líneas** — ambos mezclan UI, queries a Supabase, estado y reglas de negocio (incluida la heurística de progresión de Fase vNext 2). Mantener la propuesta de `src/features/{workout,dashboard,...}` con `components/hooks/data/domain`; es prerrequisito práctico de las Fases vNext 2, 5 y 6 (no se puede extraer un motor de progresión testeable ni componentizar el dashboard sin antes separar esta lógica del componente de página).
+- ✅ `src/features/workout/`: `page.tsx` de `/entrenar/[routineId]` pasó de **1345 a 231 líneas** (había crecido por las Fases vNext 1-3). Extraído a `types.ts`, `domain/workoutMetrics.ts` (funciones puras + 7 tests nuevos), `data/workoutQueries.ts` + `data/workoutMutations.ts` (todo el acceso a Supabase/API routes), `hooks/useWorkoutSession.ts` (el hook que concentra estado + orquestación, 1:1 con la lógica original) y `components/` (`ExerciseCard`, `SetLogger`, `SubstitutionPanel`, `ReadinessModal`, `RegeneratePanel`, `RestTimerBanner`).
+- ✅ `src/features/dashboard/`: `src/app/page.tsx` pasó de **558 a 64 líneas**. Mismo patrón: `types.ts`, `data/dashboardQueries.ts` + `data/dashboardMutations.ts`, `hooks/useDashboard.ts`, `components/` (`AccountCard`, `ActiveProgramCard`, `WeeklyMetrics`, `QuickActions`, `CoachGenerator`, `SavedRoutines`).
+- Verificación: `tsc`/lint/build limpios, 50 tests unitarios y 13 de integración sin regresiones, y renderizado manual en navegador (Playwright contra el dev server) de ambas páginas sin errores de consola — el repo no tiene React Testing Library, así que no se agregaron tests de componente, solo de la lógica de dominio ya extraída (mismo patrón que `dashboardMetrics.test.ts`).
+- No se pudo ejercitar el flujo autenticado completo (login real, registrar serie, etc.) por el mismo bloqueo de egress a Supabase que afecta al resto del repo — verificado el estado no-autenticado de ambas páginas y el comportamiento vía revisión de código 1:1 contra el componente original.
 
 ## Fase vNext 10 — Observabilidad y versionado de IA
 
@@ -347,11 +350,13 @@ Reordenado desde la matriz del análisis original, con lo ya cubierto (Fases 6/8
 
 **P0 — siguiente bloque de trabajo**
 
-1. ~~**vNext 2 — Motor de progresión**~~ — ✅ base completa (2026-07-07): `src/lib/training/progression.ts` con tests, ya wireado en `/entrenar/[routineId]`. Se hizo antes que la 9 porque era acotado y de bajo riesgo (funciones puras); la extracción completa del resto del componente sigue pendiente.
+1. ~~**vNext 2 — Motor de progresión**~~ — ✅ base completa (2026-07-07): `src/lib/training/progression.ts` con tests, ya wireado en `/entrenar/[routineId]`.
 2. ~~**vNext 1 — Prescripción real**~~ — ✅ completa (2026-07-07): migración + prompts + RPCs + UI. Cierra el loop con la 2 (`priority` real en vez de asumida).
-3. ~~**vNext 3 — Readiness**~~ — ✅ completa (2026-07-07): tabla + RLS + reglas de adaptación testeadas + modal. Se priorizó sobre la 9 por ser autocontenida (no toca la arquitectura del componente, solo la extiende).
-4. **vNext 9 — Arquitectura por features.** Sigue pendiente: `/entrenar/[routineId]/page.tsx` (ahora más grande tras las Fases 1-3 de vNext) y `/app/page.tsx` todavía mezclan UI/queries/estado — cuanto más se pospone, más grande queda el refactor.
-5. **vNext 11 (resto) — Quitar `continue-on-error` de integración + E2E.** Ya con la base puesta, es cerrar el loop de calidad, no construirlo desde cero.
+3. ~~**vNext 3 — Readiness**~~ — ✅ completa (2026-07-07): tabla + RLS + reglas de adaptación testeadas + modal.
+4. ~~**vNext 9 — Arquitectura por features**~~ — ✅ completa (2026-07-07): `src/features/{workout,dashboard}/` con `types/domain/data/hooks/components`. `/entrenar/[routineId]/page.tsx` 1345→231 líneas, `/app/page.tsx` 558→64 líneas.
+5. **vNext 11 (resto) — Quitar `continue-on-error` de integración + E2E.** Bloqueada sin un PR real: `ci.yml` solo corre en push a `main` o en `pull_request`, y no hay forma de confirmar un run verde en GitHub Actions sin abrir uno.
+
+Con esto queda cerrado el bloque P0 completo del roadmap vNext.
 
 **P1 — siguiente**
 
