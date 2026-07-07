@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { MetricWorkout } from "@/lib/dashboardMetrics";
-import type { ActiveProgram, RutinaGuardada } from "../types";
+import type { ActiveProgram, CoachRecommendation, RutinaGuardada } from "../types";
 
 export async function fetchProfilePreferences(userId: string) {
   const { data } = await supabase.from("profiles").select("training_goal, injury_notes").eq("id", userId).maybeSingle();
@@ -72,4 +72,23 @@ export async function fetchRecentWorkouts() {
     .order("start_time", { ascending: false });
 
   return { data: (data || []) as unknown as MetricWorkout[], error };
+}
+
+export async function fetchCoachRecommendations() {
+  const { data } = await supabase
+    .from("coach_recommendations")
+    .select("id, category, severity, message, is_read, created_at")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  return (data || []) as unknown as CoachRecommendation[];
+}
+
+export async function fetchUnreadCoachCount() {
+  const { count } = await supabase
+    .from("coach_recommendations")
+    .select("id", { count: "exact", head: true })
+    .eq("is_read", false);
+
+  return count ?? 0;
 }

@@ -500,6 +500,44 @@ export type Database = {
           },
         ];
       };
+      coach_recommendations: {
+        Row: {
+          id: string;
+          user_id: string;
+          category: "volume_low" | "volume_high" | "fatigue" | "adherence" | "general";
+          severity: "info" | "warning" | "critical";
+          message: string;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          category: "volume_low" | "volume_high" | "fatigue" | "adherence" | "general";
+          severity: "info" | "warning" | "critical";
+          message: string;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          category?: "volume_low" | "volume_high" | "fatigue" | "adherence" | "general";
+          severity?: "info" | "warning" | "critical";
+          message?: string;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "coach_recommendations_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       user_exercise_preferences: {
         Row: {
           id: string;

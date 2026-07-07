@@ -7,6 +7,7 @@ import { OnboardingBanner } from "@/features/dashboard/components/OnboardingBann
 import { ActiveProgramCard } from "@/features/dashboard/components/ActiveProgramCard";
 import { WeeklyMetrics } from "@/features/dashboard/components/WeeklyMetrics";
 import { QuickActions } from "@/features/dashboard/components/QuickActions";
+import { CoachCard } from "@/features/dashboard/components/CoachCard";
 import { CoachGenerator } from "@/features/dashboard/components/CoachGenerator";
 import { SavedRoutines } from "@/features/dashboard/components/SavedRoutines";
 
@@ -28,6 +29,13 @@ export default function Dashboard() {
       <AccountCard user={dashboard.user} onSignOut={() => void dashboard.cerrarSesion()} />
 
       {dashboard.user && !dashboard.hasProfile && <OnboardingBanner />}
+
+      <CoachCard
+        recommendations={dashboard.coachRecommendations}
+        isLoading={dashboard.isLoadingCoach}
+        onMarkRead={(id) => void dashboard.markCoachRead(id)}
+        onDismissAll={() => void dashboard.markCoachRead(undefined, true)}
+      />
 
       {/* "Hoy": el CTA de entrenar y las rutinas guardadas van primero — es la
           acción principal, generar una rutina nueva es secundaria (Fase vNext 5). */}

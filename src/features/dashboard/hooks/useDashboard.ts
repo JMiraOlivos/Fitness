@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "@/components/SessionProvider";
 import { calcularRacha, getLastWorkoutLabel, getWorkingSets, getWorkoutVolume } from "@/lib/dashboardMetrics";
-import { fetchActiveProgram, fetchProfilePreferences, fetchRecentWorkouts, fetchSavedRoutines } from "../data/dashboardQueries";
-import { deleteRoutine, generateRoutine, saveRoutine, signOut } from "../data/dashboardMutations";
-import { INITIAL_METRICS, type ActiveProgram, type DashboardMetrics, type RutinaGuardada, type RutinaIA } from "../types";
+import { fetchActiveProgram, fetchCoachRecommendations, fetchProfilePreferences, fetchRecentWorkouts, fetchSavedRoutines } from "../data/dashboardQueries";
+import { deleteRoutine, generateCoachRecommendations, generateRoutine, markCoachRecommendationRead, saveRoutine, signOut } from "../data/dashboardMutations";
+import { INITIAL_METRICS, type ActiveProgram, type CoachRecommendation, type DashboardMetrics, type RutinaGuardada, type RutinaIA } from "../types";
 
 export function useDashboard() {
   const { user, isLoading: isSessionLoading } = useSession();
@@ -23,6 +23,8 @@ export function useDashboard() {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeProgram, setActiveProgram] = useState<ActiveProgram | null>(null);
+  const [coachRecommendations, setCoachRecommendations] = useState<CoachRecommendation[]>([]);
+  const [isLoadingCoach, setIsLoadingCoach] = useState(false);
   // Defaults to true so the onboarding banner doesn't flash before the profile
   // check resolves.
   const [hasProfile, setHasProfile] = useState(true);
@@ -33,6 +35,13 @@ export function useDashboard() {
     if (loadError) setError(loadError.message);
     else setRutinasGuardadas(data);
     setIsLoadingSaved(false);
+  }, []);
+
+  const cargarCoachRecommendations = useCallback(async () => {
+    setIsLoadingCoach(true);
+    const data = await fetchCoachRecommendations();
+    setCoachRecommendations(data);
+    setIsLoadingCoach(false);
   }, []);
 
   const cargarMetricasDashboard = useCallback(async () => {
@@ -80,6 +89,11 @@ export function useDashboard() {
     setActiveProgram(await fetchActiveProgram());
   }, []);
 
+  const regenerarRecomendaciones = useCallback(async () => {
+    await generateCoachRecommendations().catch(() => {});
+    await cargarCoachRecommendations();
+  }, [cargarCoachRecommendations]);
+
   useEffect(() => {
     if (isSessionLoading) return;
 
@@ -88,13 +102,15 @@ export function useDashboard() {
       void cargarMetricasDashboard();
       void precargarPerfil();
       void cargarProgramaActivo();
+      void cargarCoachRecommendations();
     } else {
       setRutinasGuardadas([]);
       setMetrics(INITIAL_METRICS);
       setActiveProgram(null);
+      setCoachRecommendations([]);
       setHasProfile(true);
     }
-  }, [user, isSessionLoading, cargarRutinasGuardadas, cargarMetricasDashboard, precargarPerfil, cargarProgramaActivo]);
+  }, [user, isSessionLoading, cargarRutinasGuardadas, cargarMetricasDashboard, precargarPerfil, cargarProgramaActivo, cargarCoachRecommendations]);
 
   async function cerrarSesion() {
     await signOut();
@@ -178,11 +194,18 @@ export function useDashboard() {
     isDeleting,
     activeProgram,
     hasProfile,
+    coachRecommendations,
+    isLoadingCoach,
     cerrarSesion,
     generarRutina,
     guardarRutina,
     borrarRutina,
     cargarRutinasGuardadas,
+    regenerarRecomendaciones,
+    markCoachRead: async (recommendationId?: string, markAll?: boolean) => {
+      await markCoachRecommendationRead(recommendationId, markAll);
+      await cargarCoachRecommendations();
+    },
   };
 }
 

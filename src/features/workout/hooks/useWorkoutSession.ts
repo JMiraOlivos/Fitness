@@ -31,6 +31,7 @@ import {
   enqueueReadinessLog,
 } from "@/lib/offline/queue";
 import { useConnectivity } from "@/lib/offline/useConnectivity";
+import { generateCoachRecommendations } from "@/features/dashboard/data/dashboardMutations";
 import type {
   ExercisePriority,
   ExerciseRow,
@@ -648,6 +649,8 @@ export function useWorkoutSession(routineId: string) {
 
     if (isRealWorkoutLog) {
       router.push(`/historial/${workoutLogId}`);
+      // Fire-and-forget: generate coach recommendations after finishing
+      generateCoachRecommendations().catch(() => {});
     } else {
       router.push("/historial");
     }

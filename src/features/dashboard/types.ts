@@ -55,6 +55,15 @@ export type ActiveProgram = {
   nextWeekIsDeload: boolean;
 };
 
+export type CoachRecommendation = {
+  id: string;
+  category: "volume_low" | "volume_high" | "fatigue" | "adherence" | "general";
+  severity: "info" | "warning" | "critical";
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};
+
 export const INITIAL_METRICS: DashboardMetrics = {
   weeklyVolume: 0,
   weeklySets: 0,

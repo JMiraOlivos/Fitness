@@ -409,5 +409,212 @@ Con esto queda cerrado el bloque P1 completo del roadmap vNext.
 1. ~~**vNext 4 (resto) — Aliases, verificación y `/admin/exercises`.**~~ — ✅ completa (2026-07-07): migraciones de curación + matching de aliases, `profiles.is_admin`, pantalla `/admin/exercises`.
 2. ~~**vNext 14 (resto) — Cola offline + sync de series.**~~ — ✅ completa (2026-07-07): IndexedDB + sync automático + idempotencia API + UI optimista.
 3. ~~**vNext 15 — Personalización avanzada.**~~ — ✅ completa (2026-07-07): favoritos/evitados + UI estrella + wireado a prompts de IA.
-4. **vNext 17 — Coach IA proactivo.**
+4. **vNext 17 — Coach IA proactivo.** Re-priorizado en vNext+ (ver abajo) como P0-1, con scope concreto.
 5. **vNext 13, 16, 18 — Contenido técnico, cardio/movilidad, admin.** Sin cambios respecto al análisis original: baja urgencia.
+
+---
+
+# Roadmap vNext+ — 2026-07-07
+
+Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases pendientes del vNext original (17, 13, 16, 18) se recontextualizan acá con scope concreto; el resto son ideas nuevas detectadas al auditar el código.
+
+## P0 — Lo que más urge
+
+### 1. vNext 17 — Coach IA proactivo (pendiente del roadmap original)
+
+**Objetivo:** que la app le diga al usuario qué hacer sin que tenga que ir a `/progreso` a buscar recomendaciones.
+
+**Alcance:**
+- Tabla `coach_recommendations` (user_id, category, severity, message, is_read, created_at, metadata jsonb) con RLS.
+- Persistir las recomendaciones que hoy `buildWeeklyRecommendations()` genera de forma efímera (volumen bajo/alto por grupo, fatiga, adherencia).
+- Generar una recomendación nueva al finalizar cada entrenamiento (reutilizando `detectFatigue` + `classifyVolume` + adherencia ya existentes), y al inicio de semana si no entrenó.
+- Badge de notificaciones no leídas en el ícono del Home (AppNavigation).
+- Tarjeta "Recomendaciones del coach" en el Home, arriba de QuickActions, con dismiss/marcar como leído.
+- Endpoint `POST /api/coach/recommendations/read` para marcar leído.
+
+**Fundamento:** ya existe `src/lib/training/weeklyRecommendation.ts` con la lógica, `ai_generations` para trazabilidad, y fatiga/adherencia/volumen cableados en `/progreso`. Falta solo persistir y mostrar proactivamente. Esfuerzo: medio. Impacto: alto (cierra el loop "coach inteligente").
+
+### 2. Tests E2E con Playwright
+
+**Objetivo:** tener cobertura del flujo principal de punta a punta, no solo unitarios + integración.
+
+**Alcance:**
+- Instalar Playwright como devDependency.
+- Flujo completo: signup → onboarding (wizard) → generar rutina → guardar → iniciar entrenamiento → loguear series → finalizar → ver historial → ver progreso.
+- Flujo de mesociclos: crear programa → generar semana → ver en dashboard.
+- Correr contra Postgres local + auth shim (mismo enfoque que `rpc.integration.test.ts`), sin depender de Supabase Cloud.
+- Agregar job de E2E al CI (`.github/workflows/ci.yml`).
+
+**Fundamento:** 50 tests unitarios + 22 de integración, pero **cero** tests end-to-end. La arquitectura por features (Fase vNext 9) ya está consolidada. Esfuerzo: alto. Impacto: alto (previene regresiones en el camino crítico).
+
+---
+
+## P1 — Mejoras de producto con alto retorno
+
+### 3. Personal Records (PR) tracking con celebración
+
+**Objetivo:** que el usuario sepa cuándo rompió un récord personal y lo celebre.
+
+**Alcance:**
+- Detección de PR durante la sesión: al loguear una serie en `/entrenar/[routineId]`, comparar peso/reps/volumen/1RM estimado contra el historial completo del ejercicio (excluyendo warmups). Si la nueva serie supera el máximo histórico en cualquiera de esas métricas → PR.
+- Banner/animación de celebración inline en ExerciseCard al detectar PR (confeti con CSS, toast, o animación de escala).
+- Vista histórica de PRs en `/progreso/[exerciseId]`: tabla con fecha, métrica rota, valor anterior vs nuevo.
+- Endpoint `GET /api/exercises/[exerciseId]/prs` para consultar historial de PRs.
+- Columna `is_pr` en `set_logs` (nullable boolean, se calcula al insertar) o tabla separada `personal_records`.
+
+**Fundamento:** el 1RM estimado ya se calcula. Solo falta comparar contra el historial y mostrar la celebración. Es la feature de engagement más directa que existe en apps de fitness. Esfuerzo: medio. Impacto: alto (motivación).
+
+### 4. User feedback sobre calidad de IA
+
+**Objetivo:** tener datos reales para iterar los prompts de Gemini, no solo logs de latencia/éxito.
+
+**Alcance:**
+- Columna `user_feedback` en `ai_generations` (nullable, CHECK `thumbs_up`/`thumbs_down`).
+- Botones 👍/👎 en los outputs de IA visibles al usuario:
+  - Tarjeta de rutina generada (CoachGenerator, post-generación).
+  - Insight post-entrenamiento (modal de finalización).
+  - Rutina regenerada (RegeneratePanel, post-regeneración).
+- Endpoint `POST /api/ai/feedback` que actualiza `ai_generations.user_feedback` por `generation_id`.
+- Pantalla `/admin/ai` (vNext 18 parcial): tabla filtrable de `ai_generations` con feedback, latencia, versión de prompt, tasa de éxito/fallo.
+
+**Fundamento:** `ai_generations` ya registra cada llamada. Agregar feedback es una columna + 2 botones + 1 endpoint. Sin esto, iterar prompts es a ciegas. Esfuerzo: bajo. Impacto: medio (calidad de producto a mediano plazo).
+
+### 5. Training calendar view
+
+**Objetivo:** visualizar la consistencia de entrenamiento en un grid tipo GitHub.
+
+**Alcance:**
+- Calendario de los últimos 3-6 meses en `/progreso` (o como sección colapsable en el Home).
+- Cada día con al menos un `workout_log` completado (`end_time` no nulo) se colorea según volumen total del día (escala de grises → `#CCFF00` para días de alto volumen, consistente con la paleta de la app).
+- Tooltip al hover/tap: fecha, ejercicios, volumen total.
+- Query agregada desde `workout_logs` + `set_logs` (o RPC para performance si el volumen de datos crece).
+
+**Fundamento:** los datos ya están en `workout_logs`; es solo UI. Las apps de fitness que incluyen calendario (Strava, Hevy, Strong) reportan mayor retención. Esfuerzo: bajo-medio. Impacto: alto (engagement visual).
+
+---
+
+## P2 — Deuda técnica y robustez
+
+### 6. Exercise substitution audit log
+
+**Objetivo:** no perder el historial de qué ejercicio fue sustituido por cuál.
+
+**Problema actual:** `SubstitutionPanel` hace un `UPDATE routine_exercises SET exercise_id = ?` directo — el ejercicio original se pierde para siempre. Si el usuario quiere revertir o analizar qué ejercicios tiende a sustituir, no hay datos.
+
+**Alcance:**
+- Tabla `exercise_substitutions` (routine_exercise_id, from_exercise_id, to_exercise_id, substituted_at, workout_id nullable) con RLS.
+- Actualizar `workoutMutations.ts` / endpoint de sustitución para insertar el log además del UPDATE.
+- Opcional: mostrar badge "Sustituido" en ExerciseCard con tooltip del ejercicio original.
+
+**Fundamento:** una tabla + un INSERT adicional en el flujo existente. Previene pérdida de datos irreversible. Esfuerzo: bajo. Impacto: medio (integridad de datos).
+
+### 7. React Error Boundaries
+
+**Objetivo:** que un crash en un componente no tumbe toda la página.
+
+**Problema actual:** no hay ningún `<ErrorBoundary>` en la app. Si una llamada a Gemini falla con un error no controlado o un componente cliente crashea, el usuario ve el error genérico de Next.js (pantalla en negro con stack trace en desarrollo, blank screen en producción).
+
+**Alcance:**
+- Componente `ErrorBoundary` en `src/components/ErrorBoundary.tsx` (class component, como requiere React).
+- Envolver en `layout.tsx` el `children` + suspender las páginas clave individualmente:
+  - `/entrenar/[routineId]` — si crashea, mostrar "Algo salió mal" con botón "Volver a entrenar".
+  - `/progreso` — fallback con "No se pudo cargar el progreso".
+  - `/` (dashboard) — fallback con acciones principales aún accesibles.
+- Botón "Reintentar" en cada fallback que resetea el boundary.
+
+**Fundamento:** es un solo componente + 3 wrappers en layouts/páginas. La diferencia entre "app que crashea" y "app que se recupera" es enorme en percepción de calidad. Esfuerzo: bajo. Impacto: alto.
+
+### 8. Squash de migraciones
+
+**Objetivo:** reducir el tiempo de setup para entornos nuevos (CI, staging, otro dev).
+
+**Problema actual:** 21 archivos de migración secuenciales. El CI ya tarda en aplicar `schema.sql` + 21 migraciones para los tests de integración. Un entorno staging o un dev nuevo tendría el mismo overhead.
+
+**Alcance:**
+- Script `scripts/squash-migrations.mjs` que concatena `schema.sql` + todas las migraciones en orden cronológico en un solo `supabase/schema_full.sql` idempotente.
+- Mantener los archivos individuales para traceabilidad (no se borra nada).
+- El CI de integración usa `schema_full.sql` en vez de aplicar una por una.
+- Agregar un check en CI que verifique que `schema_full.sql` está actualizado (diff contra el concatenado fresco).
+
+**Fundamento:** no cambia comportamiento, solo velocidad de setup. Esfuerzo: bajo. Impacto: medio (DX y velocidad de CI).
+
+### 9. Server Components para carga inicial
+
+**Objetivo:** reducir el LCP (Largest Contentful Paint) en páginas de datos.
+
+**Problema actual:** `/progreso/page.tsx`, `/entrenar/[routineId]/page.tsx` y `/historial/page.tsx` son `"use client"` y hacen fetch client-side. El usuario ve un spinner mientras carga. En Next.js 14 App Router, el fetch inicial puede hacerse en un Server Component con streaming/Suspense.
+
+**Alcance:**
+- Extraer la query inicial de cada página a una función async en `data/queries.ts` que use `supabaseServer` (cookies para auth).
+- El Server Component hace el fetch inicial y pasa los datos como props al Client Component.
+- El Client Component solo maneja interactividad (mutaciones, estado local).
+- Envolver en `<Suspense>` con skeleton/placeholder para streaming progresivo.
+
+**Fundamento:** la arquitectura por features (vNext 9) ya separó queries de componentes. El patrón RSC + client component es el modelo canónico de Next.js 14. Esfuerzo: medio. Impacto: medio (percepción de velocidad).
+
+### 10. Export de datos del usuario
+
+**Objetivo:** cumplir con portabilidad de datos (GDPR/CCPA) y darle poder al usuario avanzado.
+
+**Alcance:**
+- Botón "Exportar mis datos" en `/perfil`.
+- Endpoint `GET /api/user/export` que genera un JSON con:
+  - `profile`, `body_measurements`, `routines`, `routine_exercises`, `workout_logs`, `set_logs`, `readiness_logs`, `exercise_preferences`, `programs`.
+  - Ejercicios resueltos (incluir `name`/`target_muscle`/`equipment` inline, no solo IDs).
+- Descarga como archivo `.json` con timestamp en el nombre.
+- Opcional: export como `.csv` para análisis en Excel/Sheets.
+
+**Fundamento:** requerimiento legal + feature pedida por usuarios avanzados. Esfuerzo: bajo-medio. Impacto: medio (confianza y cumplimiento).
+
+---
+
+## P3 — Expansión de alcance
+
+### 11. Warm-up dinámico generado por IA
+
+**Objetivo:** que el usuario no entre frío al entrenamiento.
+
+**Alcance:**
+- Botón "Generar calentamiento" en `/entrenar/[routineId]`, visible antes de iniciar la sesión.
+- Llama a `POST /api/ai/generar-calentamiento` que recibe los grupos musculares del día y genera 3-5 ejercicios de calentamiento (movilidad articular, activación, series de aproximación).
+- Se muestran como tarjetas colapsables al inicio de la lista de ejercicios, sin persistencia (efímeros, solo para esa sesión).
+- Opcional: checkbox "Incluir series de aproximación" que agrega sets de calentamiento al primer ejercicio de cada grupo muscular.
+
+**Fundamento:** mismo pipeline de Gemini ya existente, scope reducido (no requiere migraciones). Esfuerzo: bajo. Impacto: medio (percepción de "app completa").
+
+### 12. vNext 16 — Cardio y movilidad (versión ligera)
+
+**Objetivo:** que la app no sea solo fuerza/hipertrofia.
+
+**Alcance inicial (MVP de cardio):**
+- Tabla `cardio_logs` (user_id, type, duration_seconds, distance_meters nullable, heart_rate_avg nullable, calories nullable, notes, created_at) con RLS.
+- Formulario simple en `/progreso` o en una ruta nueva `/cardio` para loguear sesión de cardio.
+- Lista de sesiones recientes con totales semanales (duración, distancia).
+- Tipos predefinidos: running, cycling, walking, swimming, rowing, other.
+
+**Diferido:** planes de cardio, integración con wearables, zonas de frecuencia cardíaca.
+
+**Fundamento:** la app ya tiene `body_measurements` — el cardio es el complemento natural. Esfuerzo: medio. Impacto: medio (expande el público objetivo).
+
+### 13. vNext 18 — Admin panel de IA (scope concreto)
+
+**Objetivo:** que un admin pueda auditar la calidad de las generaciones de IA sin queries SQL manuales.
+
+**Alcance:**
+- Pantalla `/admin/ai` (gateada por `profiles.is_admin`, mismo patrón que `/admin/exercises`).
+- Tabla de `ai_generations` con filtros: tipo (routine_generation, routine_regeneration, workout_insight), rango de fechas, éxito/fallo, feedback.
+- Métricas agregadas visibles: tasa de éxito, latencia p50/p95, distribución de feedback.
+- Detalle de cada generación: prompt version, input/output jsonb con toggle para expandir.
+
+**Fundamento:** `ai_generations` ya tiene los datos. Solo falta la UI de consulta. Esfuerzo: medio. Impacto: bajo (solo relevante para admins).
+
+---
+
+## Bonus — Correcciones chicas
+
+Cosas detectadas durante la revisión del repo que no justifican una fase propia pero conviene registrar:
+
+- **`.env.local` incompleto**: solo tiene `SUPABASE_ACCESS_TOKEN`. Faltan `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `GOOGLE_GENERATIVE_AI_API_KEY` para que la app funcione en local. No es código, pero bloquea el desarrollo.
+- **Sin `robots.txt` ni `sitemap.xml`**: si la app se indexa, conviene tenerlos. Trivial de agregar en `public/`.
+- **Sin página 404 customizada**: Next.js sirve la default. Una `not-found.tsx` con el diseño de la app (`bg-black`, `#CCFF00`, link al Home) es 10 líneas.
+- **Sin `middleware.ts` para rutas protegidas**: hoy cada página chequea `user` client-side y muestra "Inicia sesión". Un middleware que redirija a `/auth` si no hay sesión en rutas que requieren auth (`/entrenar`, `/historial`, `/progreso`, `/programas`, `/perfil`, `/admin`) mejoraría UX y seguridad. Dejar `/` y `/auth` como públicas.
