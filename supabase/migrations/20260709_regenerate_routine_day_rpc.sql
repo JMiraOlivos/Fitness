@@ -7,6 +7,7 @@
 begin;
 
 drop function if exists public.save_routine_with_exercises(text, text, jsonb);
+drop function if exists public._insert_routine_exercises(uuid, jsonb);
 
 create function public._insert_routine_exercises(
   target_routine_id uuid,
@@ -117,6 +118,8 @@ begin
 end;
 $$;
 
+drop function if exists public.regenerate_routine_day(uuid, text, text, jsonb);
+
 create function public.regenerate_routine_day(
   p_routine_id uuid,
   routine_title text,
@@ -162,6 +165,8 @@ end;
 $$;
 
 -- Compatibility wrapper mirroring save_ai_routine's Spanish-keyed single-day payload.
+drop function if exists public.regenerate_ai_routine_day(uuid, jsonb);
+
 create function public.regenerate_ai_routine_day(p_routine_id uuid, p_routine jsonb)
 returns void
 language plpgsql
