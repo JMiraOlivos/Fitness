@@ -118,6 +118,7 @@ export default function EntrenarPage() {
           onFormChange={(patch) => session.setReadinessForm((current) => ({ ...current, ...patch }))}
           onAdapt={() => void session.iniciarConReadiness(true)}
           onSkip={() => void session.iniciarConReadiness(false)}
+          onClose={() => session.setShowReadinessModal(false)}
         />
       )}
 
