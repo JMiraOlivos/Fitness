@@ -175,6 +175,14 @@ export type Database = {
           target_sets: number | null;
           target_reps: string | null;
           notes: string | null;
+          rest_seconds: number | null;
+          target_rpe: number | null;
+          target_rir: number | null;
+          tempo: string | null;
+          movement_pattern: string | null;
+          priority: string | null;
+          progression_rule: string | null;
+          substitution_criteria: string | null;
         };
         Insert: {
           id?: string;
@@ -184,6 +192,14 @@ export type Database = {
           target_sets?: number | null;
           target_reps?: string | null;
           notes?: string | null;
+          rest_seconds?: number | null;
+          target_rpe?: number | null;
+          target_rir?: number | null;
+          tempo?: string | null;
+          movement_pattern?: string | null;
+          priority?: string | null;
+          progression_rule?: string | null;
+          substitution_criteria?: string | null;
         };
         Update: {
           id?: string;
@@ -193,6 +209,14 @@ export type Database = {
           target_sets?: number | null;
           target_reps?: string | null;
           notes?: string | null;
+          rest_seconds?: number | null;
+          target_rpe?: number | null;
+          target_rir?: number | null;
+          tempo?: string | null;
+          movement_pattern?: string | null;
+          priority?: string | null;
+          progression_rule?: string | null;
+          substitution_criteria?: string | null;
         };
         Relationships: [
           {

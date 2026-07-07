@@ -3,7 +3,9 @@
 // vNext 2): same inputs, but now testable and aware of exercise priority and
 // deload weeks. Gemini can still explain *why* in prose, but the number comes
 // from here, not from the model.
-export type ExercisePriority = "principal" | "accesorio" | "aislamiento" | "correctivo";
+import type { ExercisePriority } from "./prescriptionTaxonomy";
+
+export type { ExercisePriority };
 
 export type ProgressionLastSession = {
   maxWeight: number;

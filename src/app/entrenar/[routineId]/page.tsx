@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
 import { authFetch } from "@/lib/authFetch";
-import { recommendNextSet } from "@/lib/training/progression";
+import { recommendNextSet, type ExercisePriority } from "@/lib/training/progression";
 
 type ExerciseRow = {
   id: string;
@@ -23,6 +23,13 @@ type RoutineExerciseRow = {
   target_sets: number | null;
   target_reps: string | null;
   notes: string | null;
+  rest_seconds: number | null;
+  target_rpe: number | null;
+  target_rir: number | null;
+  tempo: string | null;
+  priority: ExercisePriority | null;
+  progression_rule: string | null;
+  substitution_criteria: string | null;
   exercises?: ExerciseRow | ExerciseRow[] | null;
 };
 
@@ -79,6 +86,13 @@ type ExerciseSuggestion = {
 
 const REST_DURATION_SECONDS = 90;
 
+const PRIORITY_LABELS: Record<ExercisePriority, string> = {
+  principal: "principal",
+  accesorio: "accesorio",
+  aislamiento: "aislamiento",
+  correctivo: "correctivo",
+};
+
 function formatRestTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remaining = seconds % 60;
@@ -108,7 +122,11 @@ function getAverageRpe(logs: LocalSetLog[]) {
   return rpeLogs.reduce((sum, log) => sum + Number(log.rpe || 0), 0) / rpeLogs.length;
 }
 
-function buildSuggestion(sessionRows: HistorySetRow[], isDeloadWeek: boolean): ExerciseSuggestion | null {
+function buildSuggestion(
+  sessionRows: HistorySetRow[],
+  isDeloadWeek: boolean,
+  priority: ExercisePriority | null
+): ExerciseSuggestion | null {
   const workingRows = sessionRows.filter((row) => !row.is_warmup);
   if (workingRows.length === 0) return null;
 
@@ -117,11 +135,10 @@ function buildSuggestion(sessionRows: HistorySetRow[], isDeloadWeek: boolean): E
   const rpeValues = workingRows.filter((row) => row.rpe !== null).map((row) => row.rpe as number);
   const averageRpe = rpeValues.length > 0 ? rpeValues.reduce((sum, rpe) => sum + rpe, 0) / rpeValues.length : null;
 
-  // Exercise priority (principal/accesorio/aislamiento) isn't in the schema yet
-  // (ROADMAP.md, Fase vNext 1) — defaults to "principal" until that lands.
   const recommendation = recommendNextSet({
     lastSession: { maxWeight, lastReps: lastSet.reps, averageRpe },
     isDeloadWeek,
+    priority: priority ?? undefined,
   });
 
   return {
@@ -181,7 +198,13 @@ export default function EntrenarPage() {
     return [...(routine?.routine_exercises || [])].sort((a, b) => a.order_index - b.order_index);
   }, [routine]);
 
-  const cargarSugerencias = useCallback(async (userId: string, exerciseIds: string[], isDeloadWeek: boolean) => {
+  const cargarSugerencias = useCallback(
+    async (
+      userId: string,
+      exerciseIds: string[],
+      isDeloadWeek: boolean,
+      priorityByExercise: Record<string, ExercisePriority | null>
+    ) => {
     const { data: historyRows, error: historyError } = await supabase
       .from("set_logs")
       .select("exercise_id, workout_log_id, weight, reps, rpe, is_warmup, created_at, workout_logs!inner(user_id)")
@@ -210,7 +233,7 @@ export default function EntrenarPage() {
     const nextSuggestions: Record<string, ExerciseSuggestion> = {};
 
     for (const exerciseId of Object.keys(sessionsByExercise)) {
-      const suggestion = buildSuggestion(sessionsByExercise[exerciseId], isDeloadWeek);
+      const suggestion = buildSuggestion(sessionsByExercise[exerciseId], isDeloadWeek, priorityByExercise[exerciseId] ?? null);
       if (suggestion) {
         nextSuggestions[exerciseId] = suggestion;
       }
@@ -237,6 +260,13 @@ export default function EntrenarPage() {
             target_sets,
             target_reps,
             notes,
+            rest_seconds,
+            target_rpe,
+            target_rir,
+            tempo,
+            priority,
+            progression_rule,
+            substitution_criteria,
             exercises (
               id,
               name,
@@ -261,8 +291,16 @@ export default function EntrenarPage() {
         .map((item) => one(item.exercises)?.id)
         .filter((id): id is string => Boolean(id));
 
+      const priorityByExercise: Record<string, ExercisePriority | null> = {};
+      for (const item of loadedRoutine.routine_exercises || []) {
+        const exerciseId = one(item.exercises)?.id;
+        if (exerciseId) {
+          priorityByExercise[exerciseId] = item.priority;
+        }
+      }
+
       if (exerciseIds.length > 0) {
-        await cargarSugerencias(userId, exerciseIds, Boolean(loadedRoutine.is_deload_week));
+        await cargarSugerencias(userId, exerciseIds, Boolean(loadedRoutine.is_deload_week), priorityByExercise);
       }
 
       setIsLoading(false);
@@ -911,7 +949,29 @@ export default function EntrenarPage() {
                 </div>
               </div>
 
-              {item.notes && <p className="mb-4 text-xs text-zinc-400">{item.notes}</p>}
+              {(item.target_rpe || item.rest_seconds || item.tempo || item.priority) && (
+                <p className="mb-2 text-xs font-bold text-zinc-300">
+                  {[
+                    item.target_rpe ? `RPE ${item.target_rpe}` : null,
+                    item.target_rir ? `RIR ${item.target_rir}` : null,
+                    item.rest_seconds ? `descanso ${formatRestTime(item.rest_seconds)}` : null,
+                    item.tempo ? `tempo ${item.tempo}` : null,
+                    item.priority ? PRIORITY_LABELS[item.priority] : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
+
+              {item.notes && <p className="mb-2 text-xs text-zinc-400">{item.notes}</p>}
+
+              {(item.progression_rule || item.substitution_criteria) && (
+                <details className="mb-4 text-xs text-zinc-500">
+                  <summary className="cursor-pointer font-bold text-zinc-400">Más detalles</summary>
+                  {item.progression_rule && <p className="mt-2">Progresión: {item.progression_rule}</p>}
+                  {item.substitution_criteria && <p className="mt-1">Sustituir si: {item.substitution_criteria}</p>}
+                </details>
+              )}
 
               {substitutingItemId === item.id && (
                 <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">

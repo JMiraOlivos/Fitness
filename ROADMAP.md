@@ -257,15 +257,20 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 
 🟡 Parcial. Este mismo `ROADMAP.md` ya cumple el rol de "roadmap actualizado que no contradice el estado real" tras esta revisión. Falta únicamente `docs/QA_CHECKLIST.md` con el checklist manual (crear usuario → generar rutina → entrenar → historial → progreso → programas → RLS cruzada) — no existe todavía como documento separado.
 
-## Fase vNext 1 — Prescripción real (RPE/RIR/tempo/descanso/progresión por ejercicio)
+## Fase vNext 1 — Prescripción real (RPE/RIR/tempo/descanso/progresión por ejercicio) ✅ (completa, 2026-07-07)
 
-⬜ Pendiente, gap real. Verificado en `supabase/schema.sql`: `routine_exercises` solo tiene series/reps/notas — no existen `rest_seconds`, `target_rpe`, `target_rir`, `tempo`, `movement_pattern`, `priority`, `progression_rule` ni `substitution_criteria`. El prompt de `generar-rutina` ya usa perfil + desempeño reciente (Fase 8) pero no fuerza a Gemini a devolver estos campos estructurados. Mantener la propuesta original: migración con las 8 columnas + CHECK constraints (rpe 1-10, rir 0-5, rest 30-600s, priority enum), actualizar `routineSchema` (Zod) y el prompt, UI resumida en la tarjeta de ejercicio durante el entrenamiento. Manejar `null` para rutinas viejas.
+- ✅ Migración `20260711_add_routine_exercise_prescription.sql`: 8 columnas nullable en `routine_exercises` (`rest_seconds`, `target_rpe`, `target_rir`, `tempo`, `movement_pattern`, `priority`, `progression_rule`, `substitution_criteria`) + CHECK constraints (RPE 1-10, RIR 0-5, descanso 30-600s, `priority`/`movement_pattern` como enums). Taxonomía compartida en `src/lib/training/prescriptionTaxonomy.ts` (mismo patrón que `exerciseTaxonomy.ts`), reutilizada por `progression.ts` para el tipo `ExercisePriority`.
+- ✅ `generar-rutina` y `regenerar-dia` fuerzan estos 8 campos en el schema Zod (con `z.enum` para prioridad/patrón de movimiento) y el system prompt le pide explícitamente a Gemini que los entregue siempre.
+- ✅ `save_ai_routine`/`regenerate_ai_routine_day` mapean las claves en español de Gemini (`descansoSegundos`, `rpeObjetivo`, etc.) a las columnas nuevas vía `_insert_routine_exercises`. **Cuidado real detectado y corregido durante la implementación:** la primera versión de `save_ai_routine` dejaba de reenviar `programaId`/`numeroSemana`/`diaSemana` (mesociclos, Fase 8) al sobreescribir la función — verificado con el test de integración existente antes de mergear, y cubierto ahora con un test nuevo de persistencia de prescripción en `rpc.integration.test.ts`.
+- ✅ `/entrenar/[routineId]` muestra el resumen (`RPE 8 · RIR 2 · descanso 2:30 · tempo 3-1-1 · principal`) bajo cada ejercicio y colapsa regla de progresión/criterio de sustitución en un `<details>`. La prioridad real ahora se pasa al motor de progresión de Fase vNext 2 (antes asumía `"principal"` para todo).
+- Rutinas guardadas antes de esta migración simplemente no muestran esta línea (todos los campos nuevos son `null`).
 
 ## Fase vNext 2 — Motor determinístico de progresión ✅ (base completa, 2026-07-07)
 
 - ✅ Extraída la heurística de progresión que vivía inline en `/entrenar/[routineId]/page.tsx` a `src/lib/training/progression.ts` (`recommendNextSet`), con 9 tests (`progression.test.ts`): distingue `principal`/`accesorio`/`aislamiento`/`correctivo` (accesorios progresan reps antes que peso, aislamiento es más conservador, correctivo nunca prioriza carga), reduce automáticamente la carga en RPE ≥ 9.5, y **respeta semanas de deload** (`routines.is_deload_week`, de la Fase 8 mesociclos) reduciendo carga ~10% y bloqueando cualquier sugerencia de PR — antes la sugerencia de progresión ignoraba por completo si la semana era de deload.
 - ✅ `/entrenar/[routineId]/page.tsx` ahora consume `recommendNextSet` en vez de la heurística inline, y muestra un badge "Semana de deload" en el header cuando aplica.
-- Pendiente (fuera de este alcance): `priority` todavía no viene del schema (depende de Fase vNext 1 — hoy el motor asume `"principal"` por defecto para toda rutina existente) y no hay `fatigue.ts` con detección de fatiga multi-sesión todavía (ver Fase vNext 7, que ya tiene la tendencia histórica de 4 sesiones como insumo).
+- ✅ `priority` ya viene del schema real (Fase vNext 1, `routine_exercises.priority`) y se pasa a `recommendNextSet`; sigue asumiendo `"principal"` solo para rutinas guardadas antes de esa migración (campo `null`).
+- Pendiente (fuera de este alcance): no hay `fatigue.ts` con detección de fatiga multi-sesión todavía (ver Fase vNext 7, que ya tiene la tendencia histórica de 4 sesiones como insumo).
 
 ## Fase vNext 3 — Readiness y seguridad
 
@@ -340,8 +345,8 @@ Reordenado desde la matriz del análisis original, con lo ya cubierto (Fases 6/8
 **P0 — siguiente bloque de trabajo**
 
 1. ~~**vNext 2 — Motor de progresión**~~ — ✅ base completa (2026-07-07): `src/lib/training/progression.ts` con tests, ya wireado en `/entrenar/[routineId]`. Se hizo antes que la 9 porque era acotado y de bajo riesgo (funciones puras); la extracción completa del resto del componente sigue pendiente.
-2. **vNext 9 — Arquitectura por features.** Sigue pendiente para el resto del componente: `/entrenar/[routineId]/page.tsx` y `/app/page.tsx` todavía mezclan UI/queries/estado.
-3. **vNext 1 — Prescripción real.** Gap de coaching de mayor impacto; schema/prompt/UI bien acotados. Además desbloquea que el motor de progresión use `priority` real en vez de asumir `"principal"`.
+2. ~~**vNext 1 — Prescripción real**~~ — ✅ completa (2026-07-07): migración + prompts + RPCs + UI. Cierra el loop con la 2 (`priority` real en vez de asumida).
+3. **vNext 9 — Arquitectura por features.** Sigue pendiente para el resto del componente: `/entrenar/[routineId]/page.tsx` y `/app/page.tsx` todavía mezclan UI/queries/estado.
 4. **vNext 3 — Readiness.** Gap de seguridad/personalización diario, esfuerzo medio, tabla + modal + reglas.
 5. **vNext 11 (resto) — Quitar `continue-on-error` de integración + E2E.** Ya con la base puesta, es cerrar el loop de calidad, no construirlo desde cero.
 
