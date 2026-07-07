@@ -7,7 +7,11 @@ import { MESOCYCLE_PHASE_TARGETS, type MesocyclePhase } from '@/lib/training/mes
 import { getOptionalUserProfile, getRecentPerformanceSummary, resolveOptionalAuth } from '@/lib/supabaseServer';
 import { logAiGeneration } from '@/lib/ai/logGeneration';
 
-export const runtime = 'edge';
+// Node.js runtime instead of edge: generating a full multi-day routine with this
+// prescription schema (rest, RPE/RIR, tempo, progression rule, ... per exercise) can
+// take longer than the Edge Function's fixed ~25s cap, which was causing production
+// requests to be killed by the platform and returned as a non-JSON error page.
+export const maxDuration = 60;
 
 const apiKey =
   process.env.GOOGLE_GENERATIVE_AI_API_KEY ||

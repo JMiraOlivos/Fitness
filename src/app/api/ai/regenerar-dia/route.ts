@@ -6,7 +6,9 @@ import { EXERCISE_PRIORITIES, MOVEMENT_PATTERNS } from "@/lib/training/prescript
 import { getAuthenticatedClient, getOptionalUserProfile, getRecentPerformanceSummary } from "@/lib/supabaseServer";
 import { logAiGeneration } from "@/lib/ai/logGeneration";
 
-export const runtime = "edge";
+// Node.js runtime instead of edge: see generar-rutina/route.ts — the same heavy
+// per-exercise prescription schema can exceed the Edge Function's fixed ~25s cap.
+export const maxDuration = 60;
 
 const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_GENERATION_AI_API_KEY;
 
