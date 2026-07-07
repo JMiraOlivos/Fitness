@@ -22,3 +22,13 @@ export const FALLBACK_MUSCLE_GROUP = "General";
 export const EQUIPMENT_TYPES = ["Polea", "Barra", "Máquina", "Mancuerna", "Corporal"] as const;
 
 export const FALLBACK_EQUIPMENT = "Otro";
+
+// Mirrors exercises_difficulty_check in
+// supabase/migrations/20260715_add_exercise_catalog_curation.sql.
+export const EXERCISE_DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
+
+export const EXERCISE_DIFFICULTY_LABELS: Record<(typeof EXERCISE_DIFFICULTIES)[number], string> = {
+  beginner: "Principiante",
+  intermediate: "Intermedio",
+  advanced: "Avanzado",
+};

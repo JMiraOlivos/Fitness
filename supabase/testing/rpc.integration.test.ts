@@ -52,6 +52,12 @@ function sampleRutina(titulo: string) {
   };
 }
 
+function sampleRutinaConEjercicio(titulo: string, nombre: string, musculoObjetivo: string, equipamiento: string) {
+  const rutina = sampleRutina(titulo);
+  rutina.ejercicios[0] = { ...rutina.ejercicios[0], nombre, musculoObjetivo, equipamiento };
+  return rutina;
+}
+
 function sampleRutinaConPrograma(titulo: string, programaId: string, numeroSemana: number, diaSemana: number) {
   return { ...sampleRutina(titulo), programaId, numeroSemana, diaSemana };
 }
@@ -398,5 +404,84 @@ describe("ai_generations RLS", () => {
 
     const { rows } = await asUser(intruderId, () => client.query("select * from public.ai_generations where user_id = $1", [ownerId]));
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe("exercise catalog curation", () => {
+  it("matches a curated alias instead of creating a duplicate global exercise", async () => {
+    const userId = await createUser("alias-match@example.com");
+
+    const { rows: canonicalRows } = await client.query<{ id: string }>(
+      `insert into public.exercises (name, target_muscle, equipment, aliases, is_verified)
+       values ('Press de banca curado', 'Pecho', 'Barra', array['Press banca', 'Barbell bench press'], true)
+       returning id`
+    );
+    const canonicalId = canonicalRows[0].id;
+
+    const routineId = await asUser(userId, async () => {
+      const { rows } = await client.query<{ save_ai_routine: string }>("select save_ai_routine($1::jsonb)", [
+        JSON.stringify(sampleRutinaConEjercicio("Día alias", "Press banca", "Pecho", "Barra")),
+      ]);
+      return rows[0].save_ai_routine;
+    });
+
+    const { rows: routineExerciseRows } = await client.query("select exercise_id from public.routine_exercises where routine_id = $1", [
+      routineId,
+    ]);
+    expect(routineExerciseRows[0].exercise_id).toBe(canonicalId);
+
+    const { rows: duplicateRows } = await client.query("select count(*)::int as count from public.exercises where lower(name) = lower($1)", [
+      "Press banca",
+    ]);
+    expect(duplicateRows[0].count).toBe(0);
+  });
+
+  it("does not match an alias across a different muscle group", async () => {
+    const userId = await createUser("alias-scope@example.com");
+
+    await client.query(
+      `insert into public.exercises (name, target_muscle, equipment, aliases, is_verified)
+       values ('Remo con barra curado', 'Espalda', 'Barra', array['Remo barra'], true)`
+    );
+
+    const routineId = await asUser(userId, async () => {
+      const { rows } = await client.query<{ save_ai_routine: string }>("select save_ai_routine($1::jsonb)", [
+        // Same alias text ("Remo barra"), different muscle group — must not match.
+        JSON.stringify(sampleRutinaConEjercicio("Día alias distinto", "Remo barra", "Bíceps", "Barra")),
+      ]);
+      return rows[0].save_ai_routine;
+    });
+
+    const { rows } = await client.query(
+      `select e.target_muscle from public.routine_exercises re
+       join public.exercises e on e.id = re.exercise_id
+       where re.routine_id = $1`,
+      [routineId]
+    );
+    expect(rows[0].target_muscle).toBe("Bíceps");
+  });
+
+  it("lets an admin update the global catalog but rejects a regular user", async () => {
+    const adminId = await createUser("catalog-admin@example.com");
+    const regularId = await createUser("catalog-regular@example.com");
+    await client.query("update public.profiles set is_admin = true where id = $1", [adminId]);
+
+    const { rows: exerciseRows } = await client.query<{ id: string }>(
+      `insert into public.exercises (name, target_muscle, equipment) values ('Sentadilla libre', 'Cuádriceps', 'Barra') returning id`
+    );
+    const exerciseId = exerciseRows[0].id;
+
+    // RLS makes the row invisible to a non-admin's UPDATE rather than raising —
+    // the statement "succeeds" but silently affects 0 rows.
+    const regularUpdateResult = await asUser(regularId, () =>
+      client.query("update public.exercises set is_verified = true where id = $1", [exerciseId])
+    );
+    expect(regularUpdateResult.rowCount).toBe(0);
+
+    await asUser(adminId, () => client.query("update public.exercises set is_verified = true, canonical_name = 'Sentadilla' where id = $1", [exerciseId]));
+
+    const { rows } = await client.query("select is_verified, canonical_name from public.exercises where id = $1", [exerciseId]);
+    expect(rows[0].is_verified).toBe(true);
+    expect(rows[0].canonical_name).toBe("Sentadilla");
   });
 });
