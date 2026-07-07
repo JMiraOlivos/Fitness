@@ -3,6 +3,7 @@
 import { TrendingUp } from "lucide-react";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
 import { AccountCard } from "@/features/dashboard/components/AccountCard";
+import { OnboardingBanner } from "@/features/dashboard/components/OnboardingBanner";
 import { ActiveProgramCard } from "@/features/dashboard/components/ActiveProgramCard";
 import { WeeklyMetrics } from "@/features/dashboard/components/WeeklyMetrics";
 import { QuickActions } from "@/features/dashboard/components/QuickActions";
@@ -25,6 +26,8 @@ export default function Dashboard() {
       </header>
 
       <AccountCard user={dashboard.user} onSignOut={() => void dashboard.cerrarSesion()} />
+
+      {dashboard.user && !dashboard.hasProfile && <OnboardingBanner />}
 
       {dashboard.activeProgram && <ActiveProgramCard program={dashboard.activeProgram} />}
 

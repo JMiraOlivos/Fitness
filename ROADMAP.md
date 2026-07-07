@@ -328,9 +328,12 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 - ✅ Ya hay cobertura de reglas de dominio fitness: `progression.test.ts` (9), `readiness.test.ts` (8), `workoutMetrics.test.ts` (7) — resuelto junto con las Fases vNext 1-2-9, que es donde ese motor terminó viviendo.
 - **Falta**: tests E2E con Playwright del flujo principal (signup → generar → guardar → entrenar → registrar serie → finalizar → historial → progreso). Sin este entorno de sandbox pudiendo levantar un proyecto Supabase real, un E2E tendría que correr contra el mismo Postgres local + shim de auth que ya usa `rpc.integration.test.ts`, o esperar a tener un proyecto de staging — queda para cuando eso exista.
 
-## Fase vNext 12 — Onboarding guiado
+## Fase vNext 12 — Onboarding guiado ✅ (completa, 2026-07-07)
 
-⬜ Pendiente. `/perfil` existe (Fase 8: `training_goal`/`injury_notes`/`equipment_available`/`experience_level`) pero como formulario, no como wizard de una pregunta por pantalla con progreso visible. Mantener la propuesta tal cual — es una mejora de UX sobre datos que ya se capturan, no requiere schema nuevo.
+- ✅ `/onboarding`: wizard de una pregunta por pantalla (objetivo → nivel → equipo → restricciones → días disponibles → generar) con barra de progreso, reutilizando las mismas opciones canónicas de `/perfil` (`src/lib/profileOptions.ts`) para no violar los CHECK constraints existentes. Las restricciones se arman con chips de zonas comunes (hombro/rodilla/espalda baja/cadera) + texto libre opcional.
+- ✅ El último paso guarda el perfil y genera la primera rutina en el mismo flujo, reutilizando `generateRoutine`/`saveRoutine` de `src/features/dashboard/data/dashboardMutations.ts` (Fase 9) en vez de duplicar esa lógica — cumple el DoD original ("al final: generar primer programa") sin reinventar la generación ya existente en el dashboard.
+- ✅ `useDashboard` expone `hasProfile` (derivado de si `training_goal` está seteado) y el dashboard muestra un banner "Completa tu perfil" enlazando a `/onboarding` cuando falta, sin bloquear el resto de la app — un usuario que ya conoce el flujo puede seguir usando `/perfil` directamente.
+- Nota de alcance: no se agregó el paso de "preferencias" (pesas libres/máquinas/poleas) del análisis original porque no existe un campo de perfil para guardarlo — forzarlo dentro de `injury_notes` habría sido incorrecto; se retoma si la Fase vNext 15 (personalización) agrega ese campo.
 
 ## Fase vNext 13 — Contenido técnico por ejercicio
 
@@ -377,8 +380,10 @@ Con esto queda cerrado el bloque P0 completo del roadmap vNext — mergeado a `m
 1. ~~**vNext 7 — Progreso accionable**~~ — ✅ completa (2026-07-07): volumen vs. objetivo, fatiga multi-sesión, adherencia y tarjeta de recomendación en `/progreso`.
 2. ~~**vNext 8 (resto) — Mesociclos con fases explícitas y deload adaptativo**~~ — ✅ completa (2026-07-07): fases derivadas + multiplicadores en el prompt + sugerencia de deload adaptativo basada en las señales de la Fase 7.
 3. ~~**vNext 10 — Observabilidad IA**~~ — ✅ completa (2026-07-07): tabla `ai_generations` + versionado de prompt/schema + logging en las 3 rutas de IA.
-4. **vNext 12 — Onboarding guiado.**
+4. ~~**vNext 12 — Onboarding guiado**~~ — ✅ completa (2026-07-07): wizard en `/onboarding`, reutiliza generación/guardado del dashboard, banner de entrada cuando falta perfil.
 5. **vNext 5/6 (resto) — Reordenar Home y pulido final de UX de gimnasio**, en paralelo con la componentización de 9.
+
+Con esto quedan 4 de 5 fases del bloque P1 completas. Solo resta el pulido de Home/UX.
 
 **P2 — después**
 
