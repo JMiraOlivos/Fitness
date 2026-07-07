@@ -59,10 +59,5 @@ jobs:
 
       - run: npm ci
 
-      # First real run against a hosted CI Postgres — this repo's sandbox has no
-      # Docker/network access to verify it end-to-end (see ROADMAP.md's established
-      # pattern of shipping sandbox-unverifiable changes with an explicit caveat).
-      # Remove continue-on-error once this job is confirmed green.
       - name: Integration tests
-        continue-on-error: true
         run: npm run test:integration

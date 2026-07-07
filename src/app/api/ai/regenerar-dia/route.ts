@@ -2,6 +2,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from "@/lib/exerciseTaxonomy";
+import { EXERCISE_PRIORITIES, MOVEMENT_PATTERNS } from "@/lib/training/prescriptionTaxonomy";
 import { getAuthenticatedClient, getOptionalUserProfile, getRecentPerformanceSummary } from "@/lib/supabaseServer";
 
 export const runtime = "edge";
@@ -19,6 +20,18 @@ const diaSchema = z.object({
       seriesObjetivo: z.number().default(3),
       repeticionesObjetivo: z.string().describe('Rango de reps, ej: "8-10" o "12-15"'),
       notas: z.string().describe("Consejo técnico de ejecución para este ejercicio"),
+      descansoSegundos: z.number().min(30).max(600).describe("Descanso recomendado en segundos entre series"),
+      rpeObjetivo: z.number().min(1).max(10).describe("RPE objetivo para las series de trabajo (1-10)"),
+      rirObjetivo: z.number().min(0).max(5).describe("RIR objetivo equivalente (0-5)"),
+      tempo: z.string().describe('Tempo de ejecución "excéntrico-pausa-concéntrico", ej: "3-1-1"'),
+      patronMovimiento: z.enum(MOVEMENT_PATTERNS).describe("Patrón de movimiento principal del ejercicio"),
+      prioridad: z.enum(EXERCISE_PRIORITIES).describe("Rol del ejercicio dentro de la sesión"),
+      reglaProgresion: z
+        .string()
+        .describe("Regla concreta y accionable para progresar la próxima vez que se repita este ejercicio"),
+      criterioSustitucion: z
+        .string()
+        .describe("Cuándo y por qué sustituir este ejercicio (ej: dolor, falta de equipo)"),
     })
   ),
 });
@@ -106,7 +119,11 @@ export async function POST(req: Request) {
       system: `Eres un entrenador personal experto y científico del deporte.
       Tu tarea es regenerar UN SOLO día de una rutina de entrenamiento ya existente, manteniendo el mismo enfoque
       general del día (grupo muscular / tipo de entrenamiento) salvo que el usuario pida explícitamente lo contrario.
-      IMPORTANTE: Sigue estrictamente cualquier restricción o lesión que el usuario indique.`,
+      IMPORTANTE: Sigue estrictamente cualquier restricción o lesión que el usuario indique.
+      Para cada ejercicio debes entregar siempre, además de series/reps/notas: descanso en segundos,
+      RPE objetivo, RIR objetivo, tempo, patrón de movimiento, prioridad dentro de la sesión
+      (principal/accesorio/aislamiento/correctivo), una regla concreta para progresar la próxima vez,
+      y un criterio de sustitución si el usuario siente molestia o no tiene el equipo.`,
       prompt: `Este es el día actual que hay que regenerar:
       - Título actual: ${routine.title}
       - Descripción actual: ${routine.description || "Sin descripción"}

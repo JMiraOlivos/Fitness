@@ -175,6 +175,14 @@ export type Database = {
           target_sets: number | null;
           target_reps: string | null;
           notes: string | null;
+          rest_seconds: number | null;
+          target_rpe: number | null;
+          target_rir: number | null;
+          tempo: string | null;
+          movement_pattern: string | null;
+          priority: string | null;
+          progression_rule: string | null;
+          substitution_criteria: string | null;
         };
         Insert: {
           id?: string;
@@ -184,6 +192,14 @@ export type Database = {
           target_sets?: number | null;
           target_reps?: string | null;
           notes?: string | null;
+          rest_seconds?: number | null;
+          target_rpe?: number | null;
+          target_rir?: number | null;
+          tempo?: string | null;
+          movement_pattern?: string | null;
+          priority?: string | null;
+          progression_rule?: string | null;
+          substitution_criteria?: string | null;
         };
         Update: {
           id?: string;
@@ -193,6 +209,14 @@ export type Database = {
           target_sets?: number | null;
           target_reps?: string | null;
           notes?: string | null;
+          rest_seconds?: number | null;
+          target_rpe?: number | null;
+          target_rir?: number | null;
+          tempo?: string | null;
+          movement_pattern?: string | null;
+          priority?: string | null;
+          progression_rule?: string | null;
+          substitution_criteria?: string | null;
         };
         Relationships: [
           {
@@ -338,6 +362,60 @@ export type Database = {
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      readiness_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          workout_log_id: string | null;
+          energy: number | null;
+          sleep_quality: number | null;
+          soreness: number | null;
+          joint_pain: boolean;
+          available_minutes: number | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          workout_log_id?: string | null;
+          energy?: number | null;
+          sleep_quality?: number | null;
+          soreness?: number | null;
+          joint_pain?: boolean;
+          available_minutes?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          workout_log_id?: string | null;
+          energy?: number | null;
+          sleep_quality?: number | null;
+          soreness?: number | null;
+          joint_pain?: boolean;
+          available_minutes?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "readiness_logs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "readiness_logs_workout_log_id_fkey";
+            columns: ["workout_log_id"];
+            isOneToOne: false;
+            referencedRelation: "workout_logs";
             referencedColumns: ["id"];
           },
         ];

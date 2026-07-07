@@ -56,6 +56,31 @@ function sampleRutinaConPrograma(titulo: string, programaId: string, numeroSeman
   return { ...sampleRutina(titulo), programaId, numeroSemana, diaSemana };
 }
 
+function sampleRutinaConPrescripcion(titulo: string) {
+  return {
+    titulo,
+    descripcion: "Rutina de prueba con prescripción",
+    ejercicios: [
+      {
+        nombre: "Sentadilla",
+        musculoObjetivo: "Cuádriceps",
+        equipamiento: "Barra",
+        seriesObjetivo: 4,
+        repeticionesObjetivo: "6-8",
+        notas: "Controlar el descenso",
+        descansoSegundos: 150,
+        rpeObjetivo: 8,
+        rirObjetivo: 2,
+        tempo: "3-1-1",
+        patronMovimiento: "squat",
+        prioridad: "principal",
+        reglaProgresion: "Si completas 4x8 con RPE<=7, sube 2.5kg",
+        criterioSustitucion: "Si hay dolor de rodilla, sustituir por prensa",
+      },
+    ],
+  };
+}
+
 async function createProgram(
   userId: string,
   overrides: Partial<{ name: string; durationWeeks: number; daysPerWeek: number; deloadEveryNWeeks: number | null }> = {}
@@ -92,6 +117,32 @@ describe("save_ai_routine RPC", () => {
     const { rows } = await client.query("select user_id, title from public.routines where id = $1", [routineId]);
     expect(rows[0].user_id).toBe(userId);
     expect(rows[0].title).toBe("Día 1 - Empuje");
+  });
+
+  it("persists the prescription fields (rest/RPE/RIR/tempo/priority/progression/substitution)", async () => {
+    const userId = await createUser("prescripcion@example.com");
+
+    const routineId = await asUser(userId, async () => {
+      const { rows } = await client.query<{ save_ai_routine: string }>("select save_ai_routine($1::jsonb)", [
+        JSON.stringify(sampleRutinaConPrescripcion("Día 1 - Piernas")),
+      ]);
+      return rows[0].save_ai_routine;
+    });
+
+    const { rows } = await client.query(
+      `select rest_seconds, target_rpe, target_rir, tempo, movement_pattern, priority, progression_rule, substitution_criteria
+       from public.routine_exercises where routine_id = $1`,
+      [routineId]
+    );
+
+    expect(rows[0].rest_seconds).toBe(150);
+    expect(Number(rows[0].target_rpe)).toBe(8);
+    expect(Number(rows[0].target_rir)).toBe(2);
+    expect(rows[0].tempo).toBe("3-1-1");
+    expect(rows[0].movement_pattern).toBe("squat");
+    expect(rows[0].priority).toBe("principal");
+    expect(rows[0].progression_rule).toBe("Si completas 4x8 con RPE<=7, sube 2.5kg");
+    expect(rows[0].substitution_criteria).toBe("Si hay dolor de rodilla, sustituir por prensa");
   });
 
   it("rejects saving without an authenticated user", async () => {
@@ -203,5 +254,57 @@ describe("mesociclos / programs", () => {
     await expect(saveRoutine(userId, sampleRutinaConPrograma("Semana 1 día 1 duplicado", programId, 1, 1))).rejects.toThrow(
       /duplicate key value/i
     );
+  });
+});
+
+describe("readiness_logs RLS", () => {
+  it("lets a user insert and read their own readiness log", async () => {
+    const userId = await createUser("readiness-owner@example.com");
+
+    const logId = await asUser(userId, async () => {
+      const { rows } = await client.query<{ id: string }>(
+        `insert into public.readiness_logs (user_id, energy, sleep_quality, soreness, joint_pain, available_minutes, notes)
+         values ($1, 4, 3, 2, false, 45, 'Todo bien') returning id`,
+        [userId]
+      );
+      return rows[0].id;
+    });
+
+    const { rows } = await asUser(userId, () =>
+      client.query("select energy, joint_pain from public.readiness_logs where id = $1", [logId])
+    );
+    expect(rows[0].energy).toBe(4);
+    expect(rows[0].joint_pain).toBe(false);
+  });
+
+  it("rejects inserting a readiness log under another user's id", async () => {
+    const userId = await createUser("readiness-user@example.com");
+    const otherUserId = await createUser("readiness-other@example.com");
+
+    await expect(
+      asUser(userId, () =>
+        client.query(
+          `insert into public.readiness_logs (user_id, energy, sleep_quality, soreness, joint_pain)
+           values ($1, 3, 3, 3, false)`,
+          [otherUserId]
+        )
+      )
+    ).rejects.toThrow();
+  });
+
+  it("does not let a user read another user's readiness log", async () => {
+    const ownerId = await createUser("readiness-owner2@example.com");
+    const intruderId = await createUser("readiness-intruder@example.com");
+
+    await asUser(ownerId, () =>
+      client.query(
+        `insert into public.readiness_logs (user_id, energy, sleep_quality, soreness, joint_pain)
+         values ($1, 2, 2, 4, true)`,
+        [ownerId]
+      )
+    );
+
+    const { rows } = await asUser(intruderId, () => client.query("select * from public.readiness_logs where user_id = $1", [ownerId]));
+    expect(rows).toHaveLength(0);
   });
 });
