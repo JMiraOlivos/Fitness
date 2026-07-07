@@ -40,7 +40,22 @@ export async function POST(req: Request) {
       );
     }
 
-    const { restricciones = 'Sin restricciones', diasDisponibles = 4, enfoque = 'Hipertrofia' } = await req.json();
+    const {
+      restricciones = 'Sin restricciones',
+      diasDisponibles = 4,
+      enfoque = 'Hipertrofia',
+      programaContexto,
+    }: {
+      restricciones?: string;
+      diasDisponibles?: number;
+      enfoque?: string;
+      programaContexto?: {
+        nombre: string;
+        semanaActual: number;
+        semanasTotales: number;
+        esSemanaDescarga: boolean;
+      };
+    } = await req.json();
     const google = createGoogleGenerativeAI({ apiKey });
 
     // Best-effort: an anonymous or invalid-token caller still gets a routine generated
@@ -75,6 +90,14 @@ export async function POST(req: Request) {
             .join('\n      ')}`
         : '';
 
+    const programaContextoTexto = programaContexto
+      ? `\n      Este día es parte del mesociclo "${programaContexto.nombre}", semana ${programaContexto.semanaActual} de ${programaContexto.semanasTotales}. ${
+          programaContexto.esSemanaDescarga
+            ? 'Esta es una SEMANA DE DESCARGA (deload): reduce el volumen (series por ejercicio) en 40-50% y baja la intensidad sugerida en las notas de cada ejercicio, manteniendo los mismos patrones de movimiento/grupos musculares que una semana normal de este enfoque.'
+            : 'Aplica progresión normal para esta semana del mesociclo.'
+        }`
+      : '';
+
     const result = await generateObject({
       model: google('gemini-2.5-flash'),
       system: `Eres un entrenador personal experto y científico del deporte.
@@ -85,7 +108,7 @@ export async function POST(req: Request) {
       prompt: `Genera una rutina de entrenamiento con las siguientes especificaciones actuales:
       - Días disponibles esta semana: ${diasDisponibles}
       - Enfoque del entrenamiento: ${enfoque}
-      - Restricciones o lesiones actuales: ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ''}${historialContext}`,
+      - Restricciones o lesiones actuales: ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ''}${historialContext}${programaContextoTexto}`,
       schema: rutinaSchema,
     });
 

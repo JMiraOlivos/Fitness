@@ -80,6 +80,10 @@ export type Database = {
           user_id: string;
           title: string;
           description: string | null;
+          program_id: string | null;
+          week_number: number | null;
+          day_of_week: number | null;
+          is_deload_week: boolean;
           created_at: string;
         };
         Insert: {
@@ -87,6 +91,10 @@ export type Database = {
           user_id: string;
           title: string;
           description?: string | null;
+          program_id?: string | null;
+          week_number?: number | null;
+          day_of_week?: number | null;
+          is_deload_week?: boolean;
           created_at?: string;
         };
         Update: {
@@ -94,11 +102,63 @@ export type Database = {
           user_id?: string;
           title?: string;
           description?: string | null;
+          program_id?: string | null;
+          week_number?: number | null;
+          day_of_week?: number | null;
+          is_deload_week?: boolean;
           created_at?: string;
         };
         Relationships: [
           {
             foreignKeyName: "routines_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "routines_program_id_fkey";
+            columns: ["program_id"];
+            isOneToOne: false;
+            referencedRelation: "programs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      programs: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          focus: string | null;
+          duration_weeks: number;
+          days_per_week: number;
+          deload_every_n_weeks: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          focus?: string | null;
+          duration_weeks: number;
+          days_per_week: number;
+          deload_every_n_weeks?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          focus?: string | null;
+          duration_weeks?: number;
+          days_per_week?: number;
+          deload_every_n_weeks?: number | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "programs_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
@@ -294,6 +354,9 @@ export type Database = {
           routine_title: string;
           routine_description: string | null;
           exercises_payload: Json;
+          p_program_id?: string | null;
+          p_week_number?: number | null;
+          p_day_of_week?: number | null;
         };
         Returns: string;
       };

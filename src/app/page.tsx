@@ -7,6 +7,15 @@ import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { useSession } from "@/components/SessionProvider";
 import { authFetch } from "@/lib/authFetch";
+import {
+  calcularRacha,
+  formatKg,
+  getLastWorkoutLabel,
+  getWorkingSets,
+  getWorkoutVolume,
+  type MetricSetLog,
+  type MetricWorkout,
+} from "@/lib/dashboardMetrics";
 
 type EjercicioIA = {
   nombre: string;
@@ -48,29 +57,21 @@ type RutinaGuardada = {
   routine_exercises?: RutinaExerciseGuardada[];
 };
 
-type MetricSetLog = {
-  weight: number | null;
-  reps: number | null;
-  is_warmup: boolean;
-};
-
-type MetricWorkout = {
-  id: string;
-  start_time: string;
-  end_time: string | null;
-  set_logs?: MetricSetLog[];
-};
-
-function getWorkingSets(setLogs?: MetricSetLog[]) {
-  return (setLogs || []).filter((setLog) => !setLog.is_warmup);
-}
-
 type DashboardMetrics = {
   weeklyVolume: number;
   weeklySets: number;
   weeklyWorkouts: number;
   currentStreak: number;
   lastWorkoutLabel: string;
+};
+
+type ActiveProgram = {
+  id: string;
+  name: string;
+  duration_weeks: number;
+  deload_every_n_weeks: number | null;
+  currentWeek: number;
+  nextWeekIsDeload: boolean;
 };
 
 const initialMetrics: DashboardMetrics = {
@@ -80,37 +81,6 @@ const initialMetrics: DashboardMetrics = {
   currentStreak: 0,
   lastWorkoutLabel: "Sin registros",
 };
-
-function getWorkoutVolume(setLogs?: MetricSetLog[]) {
-  return getWorkingSets(setLogs).reduce((sum, setLog) => sum + Number(setLog.weight || 0) * Number(setLog.reps || 0), 0);
-}
-
-function getLocalDateKey(value: string | Date) {
-  const date = typeof value === "string" ? new Date(value) : value;
-  return date.toLocaleDateString("en-CA");
-}
-
-function calcularRacha(workouts: MetricWorkout[]) {
-  const dates = new Set(workouts.filter((workout) => workout.end_time).map((workout) => getLocalDateKey(workout.start_time)));
-  let streak = 0;
-  const cursor = new Date();
-
-  while (dates.has(getLocalDateKey(cursor))) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  return streak;
-}
-
-function formatKg(value: number) {
-  return new Intl.NumberFormat("es-CL").format(Math.round(value));
-}
-
-function getLastWorkoutLabel(workouts: MetricWorkout[]) {
-  if (workouts.length === 0) return "Sin registros";
-  return new Date(workouts[0].start_time).toLocaleDateString("es-CL", { day: "2-digit", month: "short" });
-}
 
 export default function Dashboard() {
   const [diasDisponibles, setDiasDisponibles] = useState("4");
@@ -128,6 +98,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeProgram, setActiveProgram] = useState<ActiveProgram | null>(null);
 
   const precargarPerfil = useCallback(async () => {
     if (!user) return;
@@ -144,6 +115,29 @@ export default function Dashboard() {
     if (data.injury_notes) setRestricciones(data.injury_notes);
   }, [user]);
 
+  const cargarProgramaActivo = useCallback(async () => {
+    const { data: program } = await supabase
+      .from("programs")
+      .select("id, name, duration_weeks, deload_every_n_weeks")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!program) {
+      setActiveProgram(null);
+      return;
+    }
+
+    const { data: weeks } = await supabase.from("routines").select("week_number").eq("program_id", program.id);
+
+    const currentWeek = (weeks || []).reduce((max, row) => Math.max(max, row.week_number ?? 0), 0);
+    const nextWeek = currentWeek + 1;
+    const nextWeekIsDeload =
+      program.deload_every_n_weeks != null && nextWeek <= program.duration_weeks && nextWeek % program.deload_every_n_weeks === 0;
+
+    setActiveProgram({ ...program, currentWeek, nextWeekIsDeload });
+  }, []);
+
   useEffect(() => {
     if (isSessionLoading) return;
 
@@ -151,11 +145,13 @@ export default function Dashboard() {
       void cargarRutinasGuardadas();
       void cargarMetricasDashboard();
       void precargarPerfil();
+      void cargarProgramaActivo();
     } else {
       setRutinasGuardadas([]);
       setMetrics(initialMetrics);
+      setActiveProgram(null);
     }
-  }, [user, isSessionLoading, precargarPerfil]);
+  }, [user, isSessionLoading, precargarPerfil, cargarProgramaActivo]);
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -347,6 +343,20 @@ export default function Dashboard() {
           )}
         </div>
       </section>
+
+      {activeProgram && (
+        <Link
+          href={`/programas/${activeProgram.id}`}
+          className="mb-6 block rounded-2xl border border-[#CCFF00]/40 bg-[#CCFF00]/10 p-4"
+        >
+          <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Mesociclo activo</p>
+          <p className="font-black mt-1">{activeProgram.name}</p>
+          <p className="text-xs text-zinc-400 mt-1">
+            Semana {activeProgram.currentWeek} de {activeProgram.duration_weeks}
+            {activeProgram.nextWeekIsDeload ? " · próxima semana: deload" : ""}
+          </p>
+        </Link>
+      )}
 
       <section className="grid grid-cols-2 gap-4 mb-4">
         <MetricCard label="Volumen semana" value={isLoadingMetrics ? "..." : `${formatKg(metrics.weeklyVolume)} kg`} />
