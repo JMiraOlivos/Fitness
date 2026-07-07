@@ -1,4 +1,4 @@
-import { CheckCircle, Clock, Dumbbell, Repeat, Sparkles } from "lucide-react";
+import { CheckCircle, Clock, Dumbbell, Repeat, Sparkles, Star } from "lucide-react";
 import { formatRelativeDate, formatRestTime, PRIORITY_LABELS } from "../domain/workoutMetrics";
 import { SetLogger } from "./SetLogger";
 import { SubstitutionPanel } from "./SubstitutionPanel";
@@ -28,6 +28,11 @@ type ExerciseCardProps = {
   onAdjustWeight: (delta: number) => void;
   onAdjustReps: (delta: number) => void;
   onRegisterSet: () => void;
+  isFavorite: boolean;
+  isAvoided: boolean;
+  onToggleFavorite: () => void;
+  onToggleAvoided: () => void;
+  favoriteExerciseIds: Set<string>;
 };
 
 export function ExerciseCard({
@@ -54,6 +59,11 @@ export function ExerciseCard({
   onAdjustWeight,
   onAdjustReps,
   onRegisterSet,
+  isFavorite,
+  isAvoided,
+  onToggleFavorite,
+  onToggleAvoided,
+  favoriteExerciseIds,
 }: ExerciseCardProps) {
   const prescriptionSummary = [
     item.target_rpe ? `RPE ${item.target_rpe}` : null,
@@ -75,11 +85,22 @@ export function ExerciseCard({
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-[#CCFF00] font-bold uppercase">Ejercicio {item.order_index}</p>
-          <h2 className="text-xl font-black">{exercise?.name || "Ejercicio"}</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <h2 className="text-xl font-black">{exercise?.name || "Ejercicio"}</h2>
+            <button
+              type="button"
+              onClick={onToggleFavorite}
+              title={isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+              className="shrink-0 leading-none"
+            >
+              <Star className={`h-4 w-4 ${isFavorite ? "fill-[#CCFF00] text-[#CCFF00]" : "text-zinc-600"}`} />
+            </button>
+          </div>
           <p className="text-xs text-zinc-500 mt-1">
             {exercise?.target_muscle || "Músculo"} • {exercise?.equipment || "Equipo"}
           </p>
           {isOptionalToday && <p className="mt-1 text-[10px] font-bold uppercase text-amber-300">Opcional hoy · poco tiempo</p>}
+          {isAvoided && <p className="mt-1 text-[10px] font-bold uppercase text-red-400">Evitado · usa Sustituir</p>}
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <button type="button" onClick={onToggleCompleted} className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-400">
@@ -93,6 +114,9 @@ export function ExerciseCard({
           </button>
           <button type="button" onClick={onToggleSubstitution} className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-400">
             <Repeat className="h-3 w-3" /> Sustituir
+          </button>
+          <button type="button" onClick={onToggleAvoided} className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-400">
+            {isAvoided ? "Quitar evitar" : "Evitar"}
           </button>
         </div>
       </div>
@@ -130,6 +154,7 @@ export function ExerciseCard({
           isLoading={isLoadingSubstitutes}
           options={substituteOptions}
           isSubstituting={isSubstituting}
+          favoriteExerciseIds={favoriteExerciseIds}
           onSelect={onSelectSubstitute}
           onCancel={onCancelSubstitution}
         />

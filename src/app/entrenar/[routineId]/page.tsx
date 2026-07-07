@@ -237,6 +237,11 @@ export default function EntrenarPage() {
               onAdjustWeight={(delta) => session.ajustarPeso(item.id, delta)}
               onAdjustReps={(delta) => session.ajustarReps(item.id, delta)}
               onRegisterSet={() => void session.registrarSerie(item)}
+              isFavorite={exercise?.id ? session.favoriteExerciseIds.has(exercise.id) : false}
+              isAvoided={exercise?.id ? session.avoidedExerciseIds.has(exercise.id) : false}
+              onToggleFavorite={() => exercise?.id && session.toggleFavorite(exercise.id)}
+              onToggleAvoided={() => exercise?.id && session.toggleAvoided(exercise.id)}
+              favoriteExerciseIds={session.favoriteExerciseIds}
             />
           );
         })}

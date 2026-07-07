@@ -194,3 +194,28 @@ export async function getExerciseSessionHistory(
 
   return result;
 }
+
+export type ExercisePreferenceRow = {
+  exercise_id: string;
+  exercise_name: string;
+  target_muscle: string;
+  is_favorite: boolean;
+  is_avoided: boolean;
+};
+
+export async function getUserExercisePreferences(auth: OptionalAuth): Promise<ExercisePreferenceRow[]> {
+  if (!auth) return [];
+
+  const { data } = await auth.supabase
+    .from("user_exercise_preferences")
+    .select("exercise_id, is_favorite, is_avoided, exercises ( name, target_muscle )")
+    .eq("user_id", auth.user.id);
+
+  return (data || []).map((row: any) => ({
+    exercise_id: row.exercise_id,
+    exercise_name: Array.isArray(row.exercises) ? row.exercises[0]?.name : row.exercises?.name || "Ejercicio",
+    target_muscle: Array.isArray(row.exercises) ? row.exercises[0]?.target_muscle : row.exercises?.target_muscle || "",
+    is_favorite: row.is_favorite,
+    is_avoided: row.is_avoided,
+  }));
+}

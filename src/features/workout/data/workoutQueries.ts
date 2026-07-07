@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { ExerciseRow, HistorySetRow, RoutineRow } from "../types";
+import type { ExercisePreference, ExerciseRow, HistorySetRow, RoutineRow } from "../types";
 
 export async function fetchRoutine(routineId: string) {
   const { data, error } = await supabase
@@ -58,4 +58,13 @@ export async function fetchSubstituteOptions(targetMuscle: string, excludeExerci
     .limit(20);
 
   return { data: (data || []) as ExerciseRow[], error };
+}
+
+export async function fetchExercisePreferences(userId: string) {
+  const { data, error } = await supabase
+    .from("user_exercise_preferences")
+    .select("id, exercise_id, is_favorite, is_avoided")
+    .eq("user_id", userId);
+
+  return { data: (data || []) as ExercisePreference[], error };
 }

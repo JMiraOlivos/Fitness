@@ -500,6 +500,57 @@ export type Database = {
           },
         ];
       };
+      user_exercise_preferences: {
+        Row: {
+          id: string;
+          user_id: string;
+          exercise_id: string;
+          is_favorite: boolean;
+          is_avoided: boolean;
+          times_used: number;
+          last_used_at: string | null;
+          created_at: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          exercise_id: string;
+          is_favorite?: boolean;
+          is_avoided?: boolean;
+          times_used?: number;
+          last_used_at?: string | null;
+          created_at?: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          exercise_id?: string;
+          is_favorite?: boolean;
+          is_avoided?: boolean;
+          times_used?: number;
+          last_used_at?: string | null;
+          created_at?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_exercise_preferences_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "user_exercise_preferences_exercise_id_fkey";
+            columns: ["exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercises";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: {

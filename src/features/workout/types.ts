@@ -85,3 +85,10 @@ export type ReadinessForm = {
 };
 
 export type { ExercisePriority };
+
+export type ExercisePreference = {
+  id: string;
+  exercise_id: string;
+  is_favorite: boolean;
+  is_avoided: boolean;
+};

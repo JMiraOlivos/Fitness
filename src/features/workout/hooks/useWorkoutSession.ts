@@ -12,12 +12,13 @@ import {
   getAverageRpe,
   getVolume,
 } from "../domain/workoutMetrics";
-import { fetchExerciseHistory, fetchRoutine, fetchSubstituteOptions } from "../data/workoutQueries";
+import { fetchExerciseHistory, fetchExercisePreferences, fetchRoutine, fetchSubstituteOptions } from "../data/workoutQueries";
 import {
   analyzeWorkout,
   finishWorkout,
   logSet,
   regenerateDay,
+  saveExercisePreference,
   saveReadinessLog,
   startWorkout,
   substituteExercise,
@@ -74,6 +75,8 @@ export function useWorkoutSession(routineId: string) {
   const exerciseRefs = useRef<Record<string, HTMLElement | null>>({});
   const { isOnline } = useConnectivity();
   const [pendingSetIds, setPendingSetIds] = useState<Set<string>>(new Set());
+  const [favoriteExerciseIds, setFavoriteExerciseIds] = useState<Set<string>>(new Set());
+  const [avoidedExerciseIds, setAvoidedExerciseIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (restSecondsLeft === null || restSecondsLeft <= 0) return;
@@ -170,6 +173,12 @@ export function useWorkoutSession(routineId: string) {
 
       if (exerciseIds.length > 0) {
         await cargarSugerencias(userId, exerciseIds, Boolean(loadedRoutine.is_deload_week), priorityByExercise);
+      }
+
+      const { data: preferences } = await fetchExercisePreferences(userId);
+      if (preferences) {
+        setFavoriteExerciseIds(new Set(preferences.filter((p) => p.is_favorite).map((p) => p.exercise_id)));
+        setAvoidedExerciseIds(new Set(preferences.filter((p) => p.is_avoided).map((p) => p.exercise_id)));
       }
 
       setIsLoading(false);
@@ -273,6 +282,36 @@ export function useWorkoutSession(routineId: string) {
         exerciseRefs.current[nextItem.id]?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
+  }
+
+  async function toggleFavorite(exerciseId: string) {
+    const isFavorite = !favoriteExerciseIds.has(exerciseId);
+    setFavoriteExerciseIds((current) => {
+      const next = new Set(current);
+      if (isFavorite) {
+        next.add(exerciseId);
+        setAvoidedExerciseIds((a) => { const n = new Set(a); n.delete(exerciseId); return n; });
+      } else {
+        next.delete(exerciseId);
+      }
+      return next;
+    });
+    await saveExercisePreference(exerciseId, isFavorite, undefined).catch(() => {});
+  }
+
+  async function toggleAvoided(exerciseId: string) {
+    const isAvoided = !avoidedExerciseIds.has(exerciseId);
+    setAvoidedExerciseIds((current) => {
+      const next = new Set(current);
+      if (isAvoided) {
+        next.add(exerciseId);
+        setFavoriteExerciseIds((a) => { const n = new Set(a); n.delete(exerciseId); return n; });
+      } else {
+        next.delete(exerciseId);
+      }
+      return next;
+    });
+    await saveExercisePreference(exerciseId, undefined, isAvoided).catch(() => {});
   }
 
   async function abrirSustitucion(item: RoutineExerciseRow) {
@@ -665,6 +704,10 @@ export function useWorkoutSession(routineId: string) {
     isOnline,
     pendingSetIds,
     hasPendingOps: pendingSetIds.size > 0,
+    favoriteExerciseIds,
+    avoidedExerciseIds,
+    toggleFavorite,
+    toggleAvoided,
   };
 }
 

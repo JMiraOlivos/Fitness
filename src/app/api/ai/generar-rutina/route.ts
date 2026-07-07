@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from '@/lib/exerciseTaxonomy';
 import { EXERCISE_PRIORITIES, MOVEMENT_PATTERNS } from '@/lib/training/prescriptionTaxonomy';
 import { MESOCYCLE_PHASE_TARGETS, type MesocyclePhase } from '@/lib/training/mesocycle';
-import { getOptionalUserProfile, getRecentPerformanceSummary, resolveOptionalAuth } from '@/lib/supabaseServer';
+import { getOptionalUserProfile, getRecentPerformanceSummary, getUserExercisePreferences, resolveOptionalAuth } from '@/lib/supabaseServer';
 import { logAiGeneration } from '@/lib/ai/logGeneration';
 
 // Node.js runtime instead of edge: generating a full multi-day routine with this
@@ -87,6 +87,9 @@ export async function POST(req: Request) {
     auth = await resolveOptionalAuth(req);
     const profile = await getOptionalUserProfile(auth);
     const recentPerformance = await getRecentPerformanceSummary(auth);
+    const preferences = await getUserExercisePreferences(auth);
+    const favoriteNames = preferences.filter((p) => p.is_favorite).map((p) => `${p.exercise_name} (${p.target_muscle})`);
+    const avoidedNames = preferences.filter((p) => p.is_avoided).map((p) => `${p.exercise_name} (${p.target_muscle})`);
 
     const restriccionesCompletas = profile?.injury_notes
       ? `${restricciones}. Restricciones persistentes del perfil del usuario (siempre aplican, aunque no se repitan arriba): ${profile.injury_notes}`
@@ -129,6 +132,8 @@ export async function POST(req: Request) {
       IMPORTANTE: Sigue estrictamente las restricciones o lesiones que el usuario indique en su solicitud.
       Si recibes el historial reciente de desempeño del usuario, aplica principios reales de sobrecarga progresiva
       en vez de generar pesos/reps genéricos.
+      Si el usuario tiene ejercicios favoritos listados abajo, prefiérelos cuando trabajes el grupo muscular
+      correspondiente. NUNCA incluyas ejercicios de la lista de evitados — usa alternativas del mismo grupo.
       Para cada ejercicio debes entregar siempre, además de series/reps/notas: descanso en segundos,
       RPE objetivo, RIR objetivo, tempo, patrón de movimiento, prioridad dentro de la sesión
       (principal/accesorio/aislamiento/correctivo), una regla concreta para progresar la próxima vez,
@@ -136,7 +141,7 @@ export async function POST(req: Request) {
       prompt: `Genera una rutina de entrenamiento con las siguientes especificaciones actuales:
       - Días disponibles esta semana: ${diasDisponibles}
       - Enfoque del entrenamiento: ${enfoque}
-      - Restricciones o lesiones actuales: ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ''}${historialContext}${programaContextoTexto}`,
+      - Restricciones o lesiones actuales: ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ''}${historialContext}${programaContextoTexto}${favoriteNames.length > 0 ? `\n      Ejercicios favoritos del usuario (prefiérelos cuando trabajes el grupo correspondiente): ${favoriteNames.join(', ')}` : ''}${avoidedNames.length > 0 ? `\n      Ejercicios que el usuario quiere EVITAR (NUNCA los incluyas, busca alternativas del mismo grupo muscular): ${avoidedNames.join(', ')}` : ''}`,
       schema: rutinaSchema,
     });
 

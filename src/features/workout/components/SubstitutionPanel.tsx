@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 import type { ExerciseRow } from "../types";
 
 type SubstitutionPanelProps = {
@@ -6,11 +6,17 @@ type SubstitutionPanelProps = {
   isLoading: boolean;
   options: ExerciseRow[];
   isSubstituting: boolean;
+  favoriteExerciseIds: Set<string>;
   onSelect: (option: ExerciseRow) => void;
   onCancel: () => void;
 };
 
-export function SubstitutionPanel({ targetMuscle, isLoading, options, isSubstituting, onSelect, onCancel }: SubstitutionPanelProps) {
+export function SubstitutionPanel({ targetMuscle, isLoading, options, isSubstituting, favoriteExerciseIds, onSelect, onCancel }: SubstitutionPanelProps) {
+  const sorted = [...options].sort((a, b) => {
+    const aFav = favoriteExerciseIds.has(a.id) ? 1 : 0;
+    const bFav = favoriteExerciseIds.has(b.id) ? 1 : 0;
+    return bFav - aFav || a.name.localeCompare(b.name);
+  });
   return (
     <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
       <p className="text-[10px] uppercase font-bold text-zinc-400 mb-2">Sustituir por otro ejercicio de {targetMuscle || "este grupo muscular"}</p>
@@ -19,9 +25,9 @@ export function SubstitutionPanel({ targetMuscle, isLoading, options, isSubstitu
 
       {!isLoading && options.length === 0 && <p className="text-xs text-zinc-500">No hay otros ejercicios registrados para este grupo muscular.</p>}
 
-      {!isLoading && options.length > 0 && (
+      {!isLoading && sorted.length > 0 && (
         <div className="grid gap-2">
-          {options.map((option) => (
+          {sorted.map((option) => (
             <button
               key={option.id}
               type="button"
@@ -29,7 +35,10 @@ export function SubstitutionPanel({ targetMuscle, isLoading, options, isSubstitu
               onClick={() => onSelect(option)}
               className="flex items-center justify-between rounded-xl bg-zinc-950 px-3 py-2 text-left text-xs disabled:opacity-50"
             >
-              <span className="font-bold text-white">{option.name}</span>
+              <span className="font-bold text-white">
+                {favoriteExerciseIds.has(option.id) && <Star className="inline h-3 w-3 mr-1 fill-[#CCFF00] text-[#CCFF00]" />}
+                {option.name}
+              </span>
               <span className="text-zinc-500">{option.equipment}</span>
             </button>
           ))}

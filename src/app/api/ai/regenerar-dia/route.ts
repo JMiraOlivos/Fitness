@@ -3,7 +3,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from "@/lib/exerciseTaxonomy";
 import { EXERCISE_PRIORITIES, MOVEMENT_PATTERNS } from "@/lib/training/prescriptionTaxonomy";
-import { getAuthenticatedClient, getOptionalUserProfile, getRecentPerformanceSummary } from "@/lib/supabaseServer";
+import { getAuthenticatedClient, getOptionalUserProfile, getRecentPerformanceSummary, getUserExercisePreferences } from "@/lib/supabaseServer";
 import { logAiGeneration } from "@/lib/ai/logGeneration";
 
 // Node.js runtime instead of edge: see generar-rutina/route.ts — the same heavy
@@ -93,6 +93,9 @@ export async function POST(req: Request) {
 
     const profile = await getOptionalUserProfile(auth);
     const recentPerformance = await getRecentPerformanceSummary(auth);
+    const preferences = await getUserExercisePreferences(auth);
+    const favoriteNames = preferences.filter((p) => p.is_favorite).map((p) => `${p.exercise_name} (${p.target_muscle})`);
+    const avoidedNames = preferences.filter((p) => p.is_avoided).map((p) => `${p.exercise_name} (${p.target_muscle})`);
 
     const restriccionesCompletas = profile?.injury_notes
       ? `Restricciones persistentes del perfil del usuario (siempre aplican): ${profile.injury_notes}`
@@ -130,6 +133,8 @@ export async function POST(req: Request) {
       Tu tarea es regenerar UN SOLO día de una rutina de entrenamiento ya existente, manteniendo el mismo enfoque
       general del día (grupo muscular / tipo de entrenamiento) salvo que el usuario pida explícitamente lo contrario.
       IMPORTANTE: Sigue estrictamente cualquier restricción o lesión que el usuario indique.
+      Si el usuario tiene ejercicios favoritos listados abajo, prefiérelos cuando trabajes el grupo muscular
+      correspondiente. NUNCA incluyas ejercicios de la lista de evitados — usa alternativas del mismo grupo.
       Para cada ejercicio debes entregar siempre, además de series/reps/notas: descanso en segundos,
       RPE objetivo, RIR objetivo, tempo, patrón de movimiento, prioridad dentro de la sesión
       (principal/accesorio/aislamiento/correctivo), una regla concreta para progresar la próxima vez,
@@ -140,7 +145,7 @@ export async function POST(req: Request) {
       - Ejercicios actuales: ${currentExercises.join(", ") || "Ninguno registrado"}
 
       Instrucciones del usuario para esta regeneración: ${instrucciones || "Ninguna, propone una variante distinta pero con el mismo enfoque."}
-      ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ""}${historialContext}${deloadContext}
+      ${restriccionesCompletas}${perfilContext ? `\n      ${perfilContext}` : ""}${historialContext}${deloadContext}${favoriteNames.length > 0 ? `\n      Ejercicios favoritos del usuario: ${favoriteNames.join(', ')}` : ''}${avoidedNames.length > 0 ? `\n      Ejercicios EVITADOS (NUNCA los incluyas): ${avoidedNames.join(', ')}` : ''}
 
       Genera un nuevo título, descripción y lista de ejercicios para este día.`,
       schema: diaSchema,

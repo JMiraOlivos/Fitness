@@ -55,6 +55,10 @@ export async function regenerateDay(routineId: string, instrucciones: string) {
   return authFetch("/api/ai/regenerar-dia", { routineId, instrucciones });
 }
 
+export async function saveExercisePreference(exerciseId: string, isFavorite?: boolean, isAvoided?: boolean) {
+  return authFetch("/api/exercises/preferences", { exerciseId, isFavorite, isAvoided });
+}
+
 export async function analyzeWorkout(payload: Record<string, unknown>): Promise<WorkoutInsightResponse | null> {
   // Best-effort: attach the access token so the route can pull each exercise's
   // trend across prior sessions; still works without one (anonymous callers).
