@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Play, Square, Wand2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Play, Repeat, Square, Wand2 } from "lucide-react";
 import { one } from "@/lib/supabaseJoins";
 import { useWorkoutSession } from "@/features/workout/hooks/useWorkoutSession";
 import { defaultInput } from "@/features/workout/domain/workoutMetrics";
@@ -173,6 +173,16 @@ export default function EntrenarPage() {
           {session.isFinishing ? "Analizando..." : "Finalizar"}
         </button>
       </section>
+
+      {Object.keys(session.suggestions).length > 0 && (
+        <button
+          type="button"
+          onClick={session.aplicarTodasLasSugerencias}
+          className="mb-6 w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm font-bold text-zinc-300"
+        >
+          <Repeat className="h-4 w-4" /> Copiar sesión anterior completa
+        </button>
+      )}
 
       {session.error && <div className="mb-6 rounded-2xl border border-red-900/60 bg-red-950/40 p-4 text-sm text-red-200">{session.error}</div>}
 

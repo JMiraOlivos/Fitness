@@ -2,6 +2,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { getExerciseSessionHistory, resolveOptionalAuth } from '@/lib/supabaseServer';
+import { logAiGeneration } from '@/lib/ai/logGeneration';
 
 export const runtime = 'edge';
 
@@ -30,8 +31,12 @@ function fallbackInsight(payload: Record<string, unknown>) {
 }
 
 export async function POST(req: Request) {
+  let auth: Awaited<ReturnType<typeof resolveOptionalAuth>> = null;
+  const startedAt = Date.now();
+  let payload: any = {};
+
   try {
-    const payload = await req.json();
+    payload = await req.json();
 
     if (!apiKey) {
       return Response.json(fallbackInsight(payload));
@@ -41,7 +46,7 @@ export async function POST(req: Request) {
 
     // Best-effort: an anonymous or invalid-token caller still gets an insight from
     // just this session's numbers, matching the previous behavior.
-    const auth = await resolveOptionalAuth(req);
+    auth = await resolveOptionalAuth(req);
     const exerciseIds: string[] = Array.isArray(payload.exerciseSummaries)
       ? payload.exerciseSummaries.map((item: { exerciseId?: string }) => item.exerciseId).filter(Boolean)
       : [];
@@ -80,9 +85,31 @@ export async function POST(req: Request) {
       ${JSON.stringify(payload)}${historialContext}`,
     });
 
+    await logAiGeneration({
+      supabase: auth?.supabase ?? null,
+      userId: auth?.user.id ?? null,
+      type: 'workout_insight',
+      input: payload,
+      output: result.object,
+      latencyMs: Date.now() - startedAt,
+      success: true,
+    });
+
     return Response.json(result.object);
   } catch (error) {
     console.error('Error analizando entrenamiento con IA:', error);
+
+    await logAiGeneration({
+      supabase: auth?.supabase ?? null,
+      userId: auth?.user.id ?? null,
+      type: 'workout_insight',
+      input: payload,
+      output: null,
+      latencyMs: Date.now() - startedAt,
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido',
+    });
+
     return Response.json({ error: 'No se pudo generar el análisis del entrenamiento.' }, { status: 500 });
   }
 }

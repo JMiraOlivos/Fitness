@@ -23,6 +23,9 @@ export function useDashboard() {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeProgram, setActiveProgram] = useState<ActiveProgram | null>(null);
+  // Defaults to true so the onboarding banner doesn't flash before the profile
+  // check resolves.
+  const [hasProfile, setHasProfile] = useState(true);
 
   const cargarRutinasGuardadas = useCallback(async () => {
     setIsLoadingSaved(true);
@@ -66,6 +69,7 @@ export function useDashboard() {
     if (!user) return;
 
     const profile = await fetchProfilePreferences(user.id);
+    setHasProfile(Boolean(profile?.training_goal));
     if (!profile) return;
 
     if (profile.training_goal) setEnfoque(profile.training_goal);
@@ -88,6 +92,7 @@ export function useDashboard() {
       setRutinasGuardadas([]);
       setMetrics(INITIAL_METRICS);
       setActiveProgram(null);
+      setHasProfile(true);
     }
   }, [user, isSessionLoading, cargarRutinasGuardadas, cargarMetricasDashboard, precargarPerfil, cargarProgramaActivo]);
 
@@ -172,6 +177,7 @@ export function useDashboard() {
     setConfirmingDeleteId,
     isDeleting,
     activeProgram,
+    hasProfile,
     cerrarSesion,
     generarRutina,
     guardarRutina,

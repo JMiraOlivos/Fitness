@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Dumbbell, Loader2, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Dumbbell, Loader2, Sparkles, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { one } from "@/lib/supabaseJoins";
 import { estimateOneRepMax } from "@/lib/oneRepMax";
 import { useSession } from "@/components/SessionProvider";
+import { classifyVolume, MUSCLE_GROUP_VOLUME_TARGETS, type VolumeStatus } from "@/lib/training/volumeTargets";
+import { detectFatigue } from "@/lib/training/fatigue";
+import { buildWeeklyRecommendations } from "@/lib/training/weeklyRecommendation";
 
 type ExerciseRef = {
   id: string;
@@ -21,6 +24,7 @@ type WorkoutRef = {
 
 type SetLog = {
   id: string;
+  workout_log_id: string;
   weight: number;
   reps: number;
   rpe: number | null;
@@ -123,16 +127,89 @@ function buildMuscleGroupWeeklyVolume(setLogs: SetLog[]) {
   return Array.from(map.values()).sort((a, b) => b.volume - a.volume);
 }
 
+type ExerciseFatigue = {
+  exerciseId: string;
+  exerciseName: string;
+  isFatigued: boolean;
+};
+
+type MutableSession = { date: string; volume: number; averageRpe: number | null; rpeSum: number; rpeCount: number };
+
+// Groups working sets into per-workout-session summaries per exercise, then hands
+// each exercise's session history (oldest -> newest) to detectFatigue().
+function buildExerciseFatigue(setLogs: SetLog[]): ExerciseFatigue[] {
+  const sessionsByExercise = new Map<string, { name: string; sessions: Map<string, MutableSession> }>();
+
+  for (const setLog of setLogs) {
+    if (setLog.is_warmup) continue;
+
+    const exercise = one(setLog.exercises);
+    const workout = one(setLog.workout_logs);
+    if (!exercise?.id || !workout?.start_time) continue;
+
+    const exerciseEntry = sessionsByExercise.get(exercise.id) || { name: exercise.name, sessions: new Map() };
+
+    const session: MutableSession = exerciseEntry.sessions.get(setLog.workout_log_id) || {
+      date: workout.start_time,
+      volume: 0,
+      averageRpe: null,
+      rpeSum: 0,
+      rpeCount: 0,
+    };
+
+    const weight = Number(setLog.weight || 0);
+    const reps = Number(setLog.reps || 0);
+    session.volume += weight * reps;
+
+    if (setLog.rpe !== null) {
+      session.rpeSum += Number(setLog.rpe);
+      session.rpeCount += 1;
+      session.averageRpe = session.rpeSum / session.rpeCount;
+    }
+
+    exerciseEntry.sessions.set(setLog.workout_log_id, session);
+    sessionsByExercise.set(exercise.id, exerciseEntry);
+  }
+
+  const results: ExerciseFatigue[] = [];
+
+  for (const [exerciseId, entry] of sessionsByExercise) {
+    const orderedSessions = Array.from(entry.sessions.values())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map((session) => ({ volume: session.volume, averageRpe: session.averageRpe }));
+
+    const { isFatigued } = detectFatigue(orderedSessions);
+    results.push({ exerciseId, exerciseName: entry.name, isFatigued });
+  }
+
+  return results;
+}
+
 function formatDate(value: string) {
   if (!value) return "Sin fecha";
   return new Date(value).toLocaleDateString("es-CL", { day: "2-digit", month: "short" });
 }
+
+const VOLUME_STATUS_LABELS: Record<VolumeStatus, string> = {
+  bajo: "bajo",
+  correcto: "correcto",
+  alto: "alto",
+  desconocido: "",
+};
+
+const VOLUME_STATUS_BAR_COLOR: Record<VolumeStatus, string> = {
+  bajo: "bg-amber-400",
+  correcto: "bg-[#CCFF00]",
+  alto: "bg-red-500",
+  desconocido: "bg-zinc-500",
+};
 
 export default function ProgresoPage() {
   const { user, isLoading: isSessionLoading } = useSession();
   const [setLogs, setSetLogs] = useState<SetLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [adherence, setAdherence] = useState<{ planned: number; completed: number } | null>(null);
 
   const progress = useMemo(() => buildProgress(setLogs), [setLogs]);
   const totalVolume = useMemo(() => progress.reduce((sum, item) => sum + item.volume, 0), [progress]);
@@ -142,6 +219,28 @@ export default function ProgresoPage() {
   const maxMuscleGroupVolume = useMemo(
     () => Math.max(...muscleGroupWeeklyVolume.map((item) => item.volume), 1),
     [muscleGroupWeeklyVolume]
+  );
+
+  const exerciseFatigue = useMemo(() => buildExerciseFatigue(setLogs), [setLogs]);
+  const fatiguedExerciseNames = useMemo(
+    () => exerciseFatigue.filter((item) => item.isFatigued).map((item) => item.exerciseName),
+    [exerciseFatigue]
+  );
+  const lowVolumeMuscleGroups = useMemo(
+    () => muscleGroupWeeklyVolume.filter((item) => classifyVolume(item.muscleGroup, item.sets) === "bajo").map((item) => item.muscleGroup),
+    [muscleGroupWeeklyVolume]
+  );
+  const highVolumeMuscleGroups = useMemo(
+    () => muscleGroupWeeklyVolume.filter((item) => classifyVolume(item.muscleGroup, item.sets) === "alto").map((item) => item.muscleGroup),
+    [muscleGroupWeeklyVolume]
+  );
+  const weeklyRecommendations = useMemo(
+    () => buildWeeklyRecommendations({ lowVolumeMuscleGroups, highVolumeMuscleGroups, fatiguedExerciseNames, adherence }),
+    [lowVolumeMuscleGroups, highVolumeMuscleGroups, fatiguedExerciseNames, adherence]
+  );
+  const fatiguedExerciseIds = useMemo(
+    () => new Set(exerciseFatigue.filter((item) => item.isFatigued).map((item) => item.exerciseId)),
+    [exerciseFatigue]
   );
 
   useEffect(() => {
@@ -163,6 +262,7 @@ export default function ProgresoPage() {
         .from("set_logs")
         .select(`
           id,
+          workout_log_id,
           weight,
           reps,
           rpe,
@@ -177,6 +277,28 @@ export default function ProgresoPage() {
         setError(loadError.message);
       } else {
         setSetLogs((data || []) as unknown as SetLog[]);
+      }
+
+      const { data: program } = await supabase
+        .from("programs")
+        .select("days_per_week")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (program) {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const { count } = await supabase
+          .from("workout_logs")
+          .select("id", { count: "exact", head: true })
+          .not("end_time", "is", null)
+          .gte("start_time", sevenDaysAgo.toISOString());
+
+        setAdherence({ planned: program.days_per_week, completed: count || 0 });
+      } else {
+        setAdherence(null);
       }
 
       setIsLoading(false);
@@ -223,6 +345,21 @@ export default function ProgresoPage() {
 
       {error && <div className="rounded-2xl border border-red-900/60 bg-red-950/40 p-4 text-sm text-red-200">{error}</div>}
 
+      {user && !isLoading && weeklyRecommendations.length > 0 && (
+        <section className="mb-8 rounded-3xl border border-[#CCFF00]/40 bg-[#CCFF00]/10 p-4">
+          <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider inline-flex items-center gap-1">
+            <Sparkles className="h-3.5 w-3.5" /> Qué ajustar esta semana
+          </p>
+          <div className="mt-3 grid gap-2">
+            {weeklyRecommendations.map((recommendation) => (
+              <p key={recommendation} className="text-sm text-zinc-200">
+                {recommendation}
+              </p>
+            ))}
+          </div>
+        </section>
+      )}
+
       {user && !isLoading && progress.length > 0 && (
         <section className="grid grid-cols-3 gap-3 mb-8">
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
@@ -244,20 +381,44 @@ export default function ProgresoPage() {
         <section className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
           <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Volumen semanal por grupo muscular</p>
           <div className="mt-4 grid gap-3">
-            {muscleGroupWeeklyVolume.map((item) => (
-              <div key={item.muscleGroup}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="font-bold text-zinc-300">{item.muscleGroup}</span>
-                  <span className="text-zinc-500">{Math.round(item.volume)} kg · {item.sets} series</span>
+            {muscleGroupWeeklyVolume.map((item) => {
+              const target = MUSCLE_GROUP_VOLUME_TARGETS[item.muscleGroup as keyof typeof MUSCLE_GROUP_VOLUME_TARGETS];
+              const status = classifyVolume(item.muscleGroup, item.sets);
+
+              return (
+                <div key={item.muscleGroup}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-bold text-zinc-300">{item.muscleGroup}</span>
+                    <span className="text-zinc-500">
+                      {item.sets}
+                      {target ? ` / ${target.min}-${target.max}` : ""} series
+                      {VOLUME_STATUS_LABELS[status] ? ` · ${VOLUME_STATUS_LABELS[status]}` : ""}
+                    </span>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-zinc-900">
+                    <div
+                      className={`h-full rounded-full ${VOLUME_STATUS_BAR_COLOR[status]}`}
+                      style={{ width: `${Math.max(8, (item.volume / maxMuscleGroupVolume) * 100)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-zinc-900">
-                  <div
-                    className="h-full rounded-full bg-[#CCFF00]"
-                    style={{ width: `${Math.max(8, (item.volume / maxMuscleGroupVolume) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {user && !isLoading && adherence && (
+        <section className="mb-6 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+          <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Adherencia esta semana</p>
+          <p className="text-xl font-black mt-1">
+            {adherence.completed} / {adherence.planned} entrenamientos
+          </p>
+          <div className="mt-3 h-3 overflow-hidden rounded-full bg-zinc-900">
+            <div
+              className="h-full rounded-full bg-[#CCFF00]"
+              style={{ width: `${Math.min(100, Math.max(4, (adherence.completed / adherence.planned) * 100))}%` }}
+            />
           </div>
         </section>
       )}
@@ -288,6 +449,11 @@ export default function ProgresoPage() {
                 <div>
                   <h2 className="text-xl font-black">{item.name}</h2>
                   <p className="text-xs text-zinc-500 mt-1">{item.targetMuscle} · {item.equipment} · último {formatDate(item.lastDate)}</p>
+                  {fatiguedExerciseIds.has(item.id) && (
+                    <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-300">
+                      <AlertTriangle className="h-3 w-3" /> Señales de fatiga
+                    </p>
+                  )}
                 </div>
                 <Dumbbell className="h-6 w-6 text-[#CCFF00] shrink-0" />
               </div>

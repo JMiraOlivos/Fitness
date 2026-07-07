@@ -4,6 +4,7 @@ import { z } from "zod";
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from "@/lib/exerciseTaxonomy";
 import { EXERCISE_PRIORITIES, MOVEMENT_PATTERNS } from "@/lib/training/prescriptionTaxonomy";
 import { getAuthenticatedClient, getOptionalUserProfile, getRecentPerformanceSummary } from "@/lib/supabaseServer";
+import { logAiGeneration } from "@/lib/ai/logGeneration";
 
 export const runtime = "edge";
 
@@ -43,18 +44,25 @@ type RoutineExerciseRow = {
 };
 
 export async function POST(req: Request) {
+  let authResult: Awaited<ReturnType<typeof getAuthenticatedClient>> | null = null;
+  let requestBody: unknown = null;
+  const startedAt = Date.now();
+
   try {
     if (!apiKey) {
       return Response.json({ error: "Falta configurar GOOGLE_GENERATIVE_AI_API_KEY en las variables de entorno de Vercel." }, { status: 500 });
     }
 
-    const auth = await getAuthenticatedClient(req);
+    authResult = await getAuthenticatedClient(req);
 
-    if ("error" in auth) {
+    if ("error" in authResult) {
       return Response.json({ error: "Inicia sesión para regenerar una rutina." }, { status: 401 });
     }
 
+    const auth = authResult;
+
     const { routineId, instrucciones = "" } = await req.json();
+    requestBody = { routineId, instrucciones };
 
     if (!routineId || typeof routineId !== "string") {
       return Response.json({ error: "Falta el ID de la rutina." }, { status: 400 });
@@ -143,12 +151,47 @@ export async function POST(req: Request) {
 
     if (regenerateError) {
       console.error("Error regenerando rutina vía RPC:", regenerateError);
+
+      await logAiGeneration({
+        supabase: auth.supabase,
+        userId: auth.user.id,
+        type: "routine_regeneration",
+        input: requestBody,
+        output: result.object,
+        latencyMs: Date.now() - startedAt,
+        success: false,
+        error: regenerateError.message,
+      });
+
       return Response.json({ error: regenerateError.message }, { status: 500 });
     }
+
+    await logAiGeneration({
+      supabase: auth.supabase,
+      userId: auth.user.id,
+      type: "routine_regeneration",
+      input: requestBody,
+      output: result.object,
+      latencyMs: Date.now() - startedAt,
+      success: true,
+    });
 
     return Response.json({ ok: true });
   } catch (error) {
     console.error("Error regenerando el día con Gemini:", error);
+
+    const auth = authResult && !("error" in authResult) ? authResult : null;
+    await logAiGeneration({
+      supabase: auth?.supabase ?? null,
+      userId: auth?.user.id ?? null,
+      type: "routine_regeneration",
+      input: requestBody,
+      output: null,
+      latencyMs: Date.now() - startedAt,
+      success: false,
+      error: error instanceof Error ? error.message : "Error desconocido",
+    });
+
     return Response.json({ error: "Fallo al procesar la solicitud de IA" }, { status: 500 });
   }
 }
