@@ -3,6 +3,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from '@/lib/exerciseTaxonomy';
 import { EXERCISE_PRIORITIES, MOVEMENT_PATTERNS } from '@/lib/training/prescriptionTaxonomy';
+import { MESOCYCLE_PHASE_TARGETS, type MesocyclePhase } from '@/lib/training/mesocycle';
 import { getOptionalUserProfile, getRecentPerformanceSummary, resolveOptionalAuth } from '@/lib/supabaseServer';
 
 export const runtime = 'edge';
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
         nombre: string;
         semanaActual: number;
         semanasTotales: number;
-        esSemanaDescarga: boolean;
+        fase: MesocyclePhase;
       };
     } = await req.json();
     const google = createGoogleGenerativeAI({ apiKey });
@@ -104,11 +105,11 @@ export async function POST(req: Request) {
         : '';
 
     const programaContextoTexto = programaContexto
-      ? `\n      Este día es parte del mesociclo "${programaContexto.nombre}", semana ${programaContexto.semanaActual} de ${programaContexto.semanasTotales}. ${
-          programaContexto.esSemanaDescarga
-            ? 'Esta es una SEMANA DE DESCARGA (deload): reduce el volumen (series por ejercicio) en 40-50% y baja la intensidad sugerida en las notas de cada ejercicio, manteniendo los mismos patrones de movimiento/grupos musculares que una semana normal de este enfoque.'
-            : 'Aplica progresión normal para esta semana del mesociclo.'
-        }`
+      ? `\n      Este día es parte del mesociclo "${programaContexto.nombre}", semana ${programaContexto.semanaActual} de ${
+          programaContexto.semanasTotales
+        } (fase: ${MESOCYCLE_PHASE_TARGETS[programaContexto.fase].label}). ${
+          MESOCYCLE_PHASE_TARGETS[programaContexto.fase].instruction
+        } Manteniendo los mismos patrones de movimiento/grupos musculares que correspondan a este enfoque.`
       : '';
 
     const result = await generateObject({

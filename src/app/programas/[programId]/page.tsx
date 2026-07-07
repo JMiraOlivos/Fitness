@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Loader2, Save, Snowflake, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Save, Snowflake, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/components/SessionProvider";
 import { authFetch } from "@/lib/authFetch";
+import { detectFatigue } from "@/lib/training/fatigue";
+import { classifyMesocyclePhase, MESOCYCLE_PHASE_TARGETS, shouldSuggestAdaptiveDeload } from "@/lib/training/mesocycle";
 
 type Program = {
   id: string;
@@ -55,6 +57,9 @@ export default function ProgramaDetallePage() {
   const [rutinasGeneradas, setRutinasGeneradas] = useState<RutinaIA[]>([]);
   const [savedIndexes, setSavedIndexes] = useState<Set<number>>(new Set());
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const [fatiguedExerciseCount, setFatiguedExerciseCount] = useState(0);
+  const [weekAdherence, setWeekAdherence] = useState<{ planned: number; completed: number } | null>(null);
+  const [forceDeload, setForceDeload] = useState(false);
 
   const loadPrograma = useCallback(async () => {
     setIsLoading(true);
@@ -77,10 +82,88 @@ export default function ProgramaDetallePage() {
     if (programResult.error) setError(programResult.error.message);
     else setProgram(programResult.data as Program | null);
 
-    if (!routinesResult.error) setRoutines((routinesResult.data || []) as RoutineDay[]);
+    const routineRows = (routinesResult.data || []) as RoutineDay[];
+    if (!routinesResult.error) setRoutines(routineRows);
+
+    const routineIds = routineRows.map((routine) => routine.id);
+    if (routineIds.length > 0) {
+      await loadSignals(routineIds, routineRows);
+    }
 
     setIsLoading(false);
   }, [programId]);
+
+  // Fatigue/adherence signals for the adaptive deload suggestion (Fase vNext 8):
+  // scoped to this program's own routines/workouts, not the user's whole history.
+  async function loadSignals(routineIds: string[], routineRows: RoutineDay[]) {
+    const { data: workoutLogs } = await supabase
+      .from("workout_logs")
+      .select("id, routine_id, start_time, end_time")
+      .in("routine_id", routineIds)
+      .order("start_time", { ascending: false })
+      .limit(20);
+
+    const recentLogs = workoutLogs || [];
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const completedThisWeek = recentLogs.filter(
+      (log) => log.end_time !== null && new Date(log.start_time) >= sevenDaysAgo
+    ).length;
+    const latestWeek = routineRows.length > 0 ? Math.max(...routineRows.map((routine) => routine.week_number ?? 0)) : 0;
+    const daysThisWeek = routineRows.filter((routine) => routine.week_number === latestWeek).length;
+    setWeekAdherence(daysThisWeek > 0 ? { planned: daysThisWeek, completed: completedThisWeek } : null);
+
+    const workoutLogIds = recentLogs.map((log) => log.id);
+    if (workoutLogIds.length === 0) {
+      setFatiguedExerciseCount(0);
+      return;
+    }
+
+    const { data: setLogs } = await supabase
+      .from("set_logs")
+      .select("workout_log_id, exercise_id, weight, reps, rpe, is_warmup, workout_logs!inner(start_time)")
+      .in("workout_log_id", workoutLogIds);
+
+    type SessionAgg = { date: string; volume: number; rpeSum: number; rpeCount: number };
+    const sessionsByExercise = new Map<string, Map<string, SessionAgg>>();
+
+    for (const row of (setLogs || []) as unknown as {
+      workout_log_id: string;
+      exercise_id: string;
+      weight: number;
+      reps: number;
+      rpe: number | null;
+      is_warmup: boolean;
+      workout_logs: { start_time: string } | { start_time: string }[] | null;
+    }[]) {
+      if (row.is_warmup) continue;
+      const workout = Array.isArray(row.workout_logs) ? row.workout_logs[0] : row.workout_logs;
+      if (!workout?.start_time) continue;
+
+      const exerciseSessions = sessionsByExercise.get(row.exercise_id) || new Map<string, SessionAgg>();
+      const session = exerciseSessions.get(row.workout_log_id) || { date: workout.start_time, volume: 0, rpeSum: 0, rpeCount: 0 };
+
+      session.volume += Number(row.weight || 0) * Number(row.reps || 0);
+      if (row.rpe !== null) {
+        session.rpeSum += Number(row.rpe);
+        session.rpeCount += 1;
+      }
+
+      exerciseSessions.set(row.workout_log_id, session);
+      sessionsByExercise.set(row.exercise_id, exerciseSessions);
+    }
+
+    let fatigued = 0;
+    for (const exerciseSessions of sessionsByExercise.values()) {
+      const ordered = Array.from(exerciseSessions.values())
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map((session) => ({ volume: session.volume, averageRpe: session.rpeCount > 0 ? session.rpeSum / session.rpeCount : null }));
+
+      if (detectFatigue(ordered).isFatigued) fatigued += 1;
+    }
+
+    setFatiguedExerciseCount(fatigued);
+  }
 
   useEffect(() => {
     if (isSessionLoading || !user) return;
@@ -99,11 +182,14 @@ export default function ProgramaDetallePage() {
   const currentWeek = weeks.length > 0 ? Math.max(...weeks.map(([week]) => week)) : 0;
   const nextWeek = currentWeek + 1;
   const programComplete = program ? nextWeek > program.duration_weeks : false;
-  const nextWeekIsDeload =
-    program?.deload_every_n_weeks != null && !programComplete && nextWeek % program.deload_every_n_weeks === 0;
+  const nextWeekPhase =
+    program && !programComplete ? classifyMesocyclePhase(nextWeek, program.duration_weeks, program.deload_every_n_weeks) : null;
+  const nextWeekIsDeload = nextWeekPhase === "deload";
+  const adaptiveDeload = shouldSuggestAdaptiveDeload({ fatiguedExerciseCount, adherence: weekAdherence });
+  const canSuggestForceDeload = !programComplete && !nextWeekIsDeload && adaptiveDeload.suggest;
 
   async function generarSemana() {
-    if (!program) return;
+    if (!program || !nextWeekPhase) return;
 
     setError(null);
     setIsGenerating(true);
@@ -127,7 +213,7 @@ export default function ProgramaDetallePage() {
             nombre: program.name,
             semanaActual: nextWeek,
             semanasTotales: program.duration_weeks,
-            esSemanaDescarga: nextWeekIsDeload,
+            fase: forceDeload ? "deload" : nextWeekPhase,
           },
         }),
       });
@@ -149,7 +235,13 @@ export default function ProgramaDetallePage() {
 
     try {
       await authFetch("/api/routines/save", {
-        rutina: { ...rutina, programaId: programId, numeroSemana: nextWeek, diaSemana: index + 1 },
+        rutina: {
+          ...rutina,
+          programaId: programId,
+          numeroSemana: nextWeek,
+          diaSemana: index + 1,
+          ...(forceDeload ? { forzarDescarga: true } : {}),
+        },
       });
 
       setSavedIndexes((current) => new Set(current).add(index));
@@ -199,11 +291,31 @@ export default function ProgramaDetallePage() {
           {!programComplete && rutinasGeneradas.length === 0 && (
             <section className="mb-6 rounded-3xl border border-zinc-800 bg-zinc-950 p-5">
               <p className="font-black">Semana {nextWeek}</p>
-              {nextWeekIsDeload && (
+              {nextWeekPhase && (
                 <p className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-blue-300">
-                  <Snowflake className="h-3 w-3" /> Semana de descarga
+                  {nextWeekIsDeload && <Snowflake className="h-3 w-3" />}
+                  Fase: {MESOCYCLE_PHASE_TARGETS[forceDeload ? "deload" : nextWeekPhase].label}
                 </p>
               )}
+
+              {canSuggestForceDeload && (
+                <div className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3">
+                  <p className="inline-flex items-start gap-2 text-xs text-amber-200">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    {adaptiveDeload.reason} ¿Tratar la semana {nextWeek} como deload aunque no toque por calendario?
+                  </p>
+                  <label className="mt-2 flex items-center gap-2 text-xs font-bold text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={forceDeload}
+                      onChange={(event) => setForceDeload(event.target.checked)}
+                      className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-[#CCFF00]"
+                    />
+                    Sí, tratar la semana {nextWeek} como deload
+                  </label>
+                </div>
+              )}
+
               <button
                 onClick={generarSemana}
                 disabled={isGenerating}
