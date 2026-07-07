@@ -270,7 +270,7 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 - ✅ Extraída la heurística de progresión que vivía inline en `/entrenar/[routineId]/page.tsx` a `src/lib/training/progression.ts` (`recommendNextSet`), con 9 tests (`progression.test.ts`): distingue `principal`/`accesorio`/`aislamiento`/`correctivo` (accesorios progresan reps antes que peso, aislamiento es más conservador, correctivo nunca prioriza carga), reduce automáticamente la carga en RPE ≥ 9.5, y **respeta semanas de deload** (`routines.is_deload_week`, de la Fase 8 mesociclos) reduciendo carga ~10% y bloqueando cualquier sugerencia de PR — antes la sugerencia de progresión ignoraba por completo si la semana era de deload.
 - ✅ `/entrenar/[routineId]/page.tsx` ahora consume `recommendNextSet` en vez de la heurística inline, y muestra un badge "Semana de deload" en el header cuando aplica.
 - ✅ `priority` ya viene del schema real (Fase vNext 1, `routine_exercises.priority`) y se pasa a `recommendNextSet`; sigue asumiendo `"principal"` solo para rutinas guardadas antes de esa migración (campo `null`).
-- Pendiente (fuera de este alcance): no hay `fatigue.ts` con detección de fatiga multi-sesión todavía (ver Fase vNext 7, que ya tiene la tendencia histórica de 4 sesiones como insumo).
+- ✅ `fatigue.ts` con detección de fatiga multi-sesión ya existe (Fase vNext 7, 2026-07-07): `detectFatigue` compara RPE/volumen entre las últimas 2 sesiones. Vive en `src/lib/training/fatigue.ts` en vez de junto a `progression.ts` porque se usa desde `/progreso`, no desde el motor de progresión del workout.
 
 ## Fase vNext 3 — Readiness y seguridad ✅ (completa, 2026-07-07)
 
@@ -291,9 +291,13 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 
 ✅ Mayormente cubierto por la Fase 5 de este roadmap (copiar serie anterior, botones rápidos ±2.5 kg/+1 rep, timer de descanso 90s, autoscroll, marcar completado, progreso visual). `ExerciseCard`/`SetLogger`/`RestTimerBanner` ya están extraídos como componentes propios (Fase vNext 9). Resta solo pulido menor no crítico: botón "copiar toda la sesión anterior" (hoy solo copia por ejercicio) y vibración opcional al terminar el descanso.
 
-## Fase vNext 7 — Progreso accionable
+## Fase vNext 7 — Progreso accionable ✅ (completa, 2026-07-07)
 
-🟡 Parcial. Volumen semanal por grupo muscular ya existe en `/progreso` (Fase 8). **Falta** comparar ese volumen contra un rango objetivo (ej. "Cuádriceps: 6 / 10-16 series - bajo"), vista de fatiga (RPE subiendo + volumen/carga bajando sesión a sesión) y adherencia (planificado vs. completado, ahora que existen `programs`/`week_number` para calcularlo). Tarjeta de recomendación concreta ("qué ajustar esta semana") depende de este cálculo — es una extensión natural del insight con tendencia histórica ya implementado en Fase 8.
+- ✅ `src/lib/training/volumeTargets.ts` (+5 tests): rangos semanales de series por grupo muscular (landmarks aproximados de literatura de hipertrofia, no personalizados todavía) y `classifyVolume` (`bajo`/`correcto`/`alto`). `/progreso` ahora muestra "Cuádriceps: 6 / 8-16 series · bajo" con la barra coloreada según el estado, en vez de solo el volumen crudo.
+- ✅ `src/lib/training/fatigue.ts` (+6 tests): `detectFatigue` compara las últimas 2 sesiones de un ejercicio (RPE sube + volumen baja ⇒ señal de fatiga). `/progreso` agrupa `set_logs` por ejercicio y sesión (`workout_log_id`) y muestra un badge "Señales de fatiga" en la tarjeta del ejercicio afectado.
+- ✅ Adherencia básica: compara `programs.days_per_week` del programa activo contra entrenamientos completados (`end_time` no nulo) en los últimos 7 días, con barra de progreso en `/progreso`.
+- ✅ `src/lib/training/weeklyRecommendation.ts` (+6 tests): compone la tarjeta "Qué ajustar esta semana" a partir de los tres signals anteriores (volumen bajo/alto por grupo, ejercicios con fatiga, adherencia por debajo del plan) — solo aparece si hay algo concreto que ajustar.
+- Nota de alcance: los rangos de volumen son fijos por grupo muscular, no personalizados por usuario/objetivo/experiencia — eso queda para cuando exista personalización real (Fase vNext 15).
 
 ## Fase vNext 8 — Mesociclos más inteligentes
 
@@ -339,7 +343,7 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 
 ## Fase vNext 17 — Coach IA proactivo
 
-⬜ Pendiente, no existe tabla `coach_recommendations`. El insight post-entrenamiento con tendencia de 4 sesiones (Fase 8) es la base sobre la que esto se construye — sin Fase vNext 7 (progreso accionable con objetivos) esta fase no tiene de dónde sacar sus recomendaciones ("volumen alto en espalda", "no entrenaste piernas") de forma confiable.
+⬜ Pendiente, no existe tabla `coach_recommendations`. El insight post-entrenamiento con tendencia de 4 sesiones (Fase 8) y `buildWeeklyRecommendations` (Fase vNext 7, ya completa) son la base sobre la que esto se construye — falta persistir esas recomendaciones como entidad propia (con `is_read`, severidad, etc.) y mostrarlas proactivamente en el Home en vez de solo en `/progreso`.
 
 ## Fase vNext 18 — Admin/calidad de producto
 
@@ -359,11 +363,11 @@ Reordenado desde la matriz del análisis original, con lo ya cubierto (Fases 6/8
 4. ~~**vNext 9 — Arquitectura por features**~~ — ✅ completa (2026-07-07): `src/features/{workout,dashboard}/` con `types/domain/data/hooks/components`. `/entrenar/[routineId]/page.tsx` 1345→231 líneas, `/app/page.tsx` 558→64 líneas.
 5. ~~**vNext 11 — Quitar `continue-on-error` de integración**~~ — ✅ completo (2026-07-07): confirmado en verde dos veces en GitHub Actions real (PR #4) antes de quitarlo. Queda pendiente solo el E2E con Playwright, sin bloquear nada del bloque P0.
 
-Con esto queda cerrado el bloque P0 completo del roadmap vNext.
+Con esto queda cerrado el bloque P0 completo del roadmap vNext — mergeado a `main` vía PR #4 (2026-07-07).
 
 **P1 — siguiente**
 
-1. **vNext 7 — Progreso accionable** (volumen vs. objetivo, fatiga, adherencia, recomendación).
+1. ~~**vNext 7 — Progreso accionable**~~ — ✅ completa (2026-07-07): volumen vs. objetivo, fatiga multi-sesión, adherencia y tarjeta de recomendación en `/progreso`.
 2. **vNext 8 (resto) — Mesociclos con fases explícitas y deload adaptativo.**
 3. **vNext 10 — Observabilidad IA**, sobre todo una vez Fase vNext 1 introduzca una v2 de schema/prompt que valga la pena versionar y comparar.
 4. **vNext 12 — Onboarding guiado.**
