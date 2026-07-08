@@ -561,7 +561,7 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 ---
 
-## P3 — Expansión de alcance
+## P3 — Expansión de alcance ✅ (completa, 2026-07-07)
 
 ### 11. Warm-up dinámico generado por IA
 

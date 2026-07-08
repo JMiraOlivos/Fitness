@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Play, Repeat, Square, Wand2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Flame, Loader2, Play, Repeat, Square, Wand2 } from "lucide-react";
 import { one } from "@/lib/supabaseJoins";
 import { useWorkoutSession } from "@/features/workout/hooks/useWorkoutSession";
 import { defaultInput } from "@/features/workout/domain/workoutMetrics";
@@ -11,11 +11,38 @@ import { ReadinessModal } from "@/features/workout/components/ReadinessModal";
 import { RegeneratePanel } from "@/features/workout/components/RegeneratePanel";
 import { RestTimerBanner } from "@/features/workout/components/RestTimerBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { supabase } from "@/lib/supabase";
+import { useState } from "react";
 
 export default function EntrenarPage() {
   const params = useParams<{ routineId: string }>();
   const routineId = params.routineId;
   const session = useWorkoutSession(routineId);
+  const [warmup, setWarmup] = useState<Array<{ nombre: string; descripcion: string; duracionSegundos: number; tipo: string }> | null>(null);
+  const [isLoadingWarmup, setIsLoadingWarmup] = useState(false);
+
+  const muscleGroups = session.routine
+    ? [...new Set((session.routine.routine_exercises || []).map((item) => one(item.exercises)?.target_muscle).filter(Boolean) as string[])]
+    : [];
+
+  async function generarCalentamiento() {
+    setIsLoadingWarmup(true);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      const accessToken = authSession?.access_token;
+      const response = await fetch("/api/ai/generar-calentamiento", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+        body: JSON.stringify({ muscleGroups }),
+      });
+      const data = await response.json();
+      setWarmup(data.calentamiento || []);
+    } catch {
+      setWarmup(null);
+    } finally {
+      setIsLoadingWarmup(false);
+    }
+  }
 
   if (session.isLoading) {
     return (
@@ -187,6 +214,35 @@ export default function EntrenarPage() {
         >
           <Repeat className="h-4 w-4" /> Copiar sesión anterior completa
         </button>
+      )}
+
+      {/* Warm-up generation */}
+      {session.routine && !session.workoutLogId && (
+        <section className="mb-6">
+          <button
+            onClick={generarCalentamiento}
+            disabled={isLoadingWarmup}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-300 disabled:opacity-40"
+          >
+            {isLoadingWarmup ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flame className="h-4 w-4" />}
+            {isLoadingWarmup ? "Generando..." : warmup ? "Regenerar calentamiento" : "Generar calentamiento con IA"}
+          </button>
+          {warmup && warmup.length > 0 && (
+            <div className="mt-3 grid gap-2">
+              {warmup.map((ej, i) => (
+                <div key={i} className="rounded-xl border border-amber-500/20 bg-amber-950/20 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-amber-200">{ej.nombre}</p>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">{ej.descripcion}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-bold text-amber-300">{ej.tipo} · {ej.duracionSegundos}s</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       {session.error && <div className="mb-6 rounded-2xl border border-red-900/60 bg-red-950/40 p-4 text-sm text-red-200">{session.error}</div>}
