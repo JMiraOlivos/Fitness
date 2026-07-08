@@ -194,6 +194,18 @@ export default function PerfilPage() {
               {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
               {isSaving ? "Guardando..." : "Guardar perfil"}
             </button>
+
+            <div className="mt-6 pt-4 border-t border-zinc-800">
+              <a
+                href="/api/user/export"
+                className="w-full rounded-2xl bg-zinc-900 border border-zinc-800 px-4 py-3 font-bold text-zinc-300 inline-flex items-center justify-center gap-2 hover:bg-zinc-800"
+              >
+                Exportar mis datos
+              </a>
+              <p className="text-[10px] text-zinc-600 mt-2 text-center">
+                Descarga un archivo JSON con tus rutinas, entrenamientos, series, medidas y récords.
+              </p>
+            </div>
           </div>
 
           {successMessage && (

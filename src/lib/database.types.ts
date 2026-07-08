@@ -593,6 +593,51 @@ export type Database = {
           },
         ];
       };
+      exercise_substitutions: {
+        Row: {
+          id: string;
+          routine_exercise_id: string;
+          from_exercise_id: string;
+          to_exercise_id: string;
+          user_id: string;
+          workout_log_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          routine_exercise_id: string;
+          from_exercise_id: string;
+          to_exercise_id: string;
+          user_id: string;
+          workout_log_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          routine_exercise_id?: string;
+          from_exercise_id?: string;
+          to_exercise_id?: string;
+          user_id?: string;
+          workout_log_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "exercise_substitutions_routine_exercise_id_fkey";
+            columns: ["routine_exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "routine_exercises";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "exercise_substitutions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       user_exercise_preferences: {
         Row: {
           id: string;

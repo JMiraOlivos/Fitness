@@ -45,7 +45,7 @@ export async function resolveOptionalAuth(req: Request) {
   return "error" in auth ? null : auth;
 }
 
-type OptionalAuth = Awaited<ReturnType<typeof resolveOptionalAuth>>;
+export type OptionalAuth = Awaited<ReturnType<typeof resolveOptionalAuth>>;
 
 // Best-effort profile lookup for routes that should still work for anonymous callers
 // (e.g. previewing a routine before signing up) but personalize when a valid token is

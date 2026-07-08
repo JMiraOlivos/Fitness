@@ -366,7 +366,8 @@ export function useWorkoutSession(routineId: string) {
     setIsSubstituting(true);
     setError(null);
 
-    const { error: updateError } = await substituteExercise(item.id, nuevoEjercicio.id);
+    const fromExerciseId = one(item.exercises)?.id;
+    const { error: updateError } = await substituteExercise(item.id, nuevoEjercicio.id, fromExerciseId, user?.id, workoutLogId ?? undefined);
 
     if (updateError) {
       enqueueSubstituteExercise(item.id, nuevoEjercicio.id);

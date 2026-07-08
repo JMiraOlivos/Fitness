@@ -2,8 +2,21 @@ import { authFetch } from "@/lib/authFetch";
 import { supabase } from "@/lib/supabase";
 import type { ReadinessForm, WorkoutInsightResponse } from "../types";
 
-export async function substituteExercise(routineExerciseId: string, newExerciseId: string) {
-  return supabase.from("routine_exercises").update({ exercise_id: newExerciseId }).eq("id", routineExerciseId);
+export async function substituteExercise(routineExerciseId: string, newExerciseId: string, fromExerciseId?: string, userId?: string, workoutLogId?: string) {
+  const result = await supabase.from("routine_exercises").update({ exercise_id: newExerciseId }).eq("id", routineExerciseId);
+
+  // Best-effort audit log
+  if (fromExerciseId && userId) {
+    void supabase.from("exercise_substitutions").insert({
+      routine_exercise_id: routineExerciseId,
+      from_exercise_id: fromExerciseId,
+      to_exercise_id: newExerciseId,
+      user_id: userId,
+      workout_log_id: workoutLogId ?? null,
+    });
+  }
+
+  return result;
 }
 
 export async function saveReadinessLog(params: {

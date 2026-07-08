@@ -486,7 +486,7 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 ---
 
-## P2 — Deuda técnica y robustez
+## P2 — Deuda técnica y robustez ✅ (completa, 2026-07-07)
 
 ### 6. Exercise substitution audit log
 
