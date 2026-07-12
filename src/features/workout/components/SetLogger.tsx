@@ -47,6 +47,41 @@ export function SetLogger({ input, onChange, onAdjustWeight, onAdjustReps, onSub
       </div>
 
       <div className="mt-2 grid grid-cols-3 gap-2">
+        <label className="grid gap-1 text-xs text-zinc-400">
+          RIR
+          <input
+            value={input.rir}
+            onChange={(event) => onChange({ rir: event.target.value })}
+            inputMode="decimal"
+            placeholder="0-5"
+            className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-3 text-white outline-none focus:border-[#CCFF00]"
+          />
+        </label>
+        <label className="grid gap-1 text-xs text-zinc-400">
+          Lado
+          <select
+            value={input.side}
+            onChange={(event) => onChange({ side: event.target.value as SetInput["side"] })}
+            className="rounded-2xl border border-zinc-800 bg-zinc-900 px-2 py-3 text-white outline-none focus:border-[#CCFF00]"
+          >
+            <option value="both">Ambos</option>
+            <option value="left">Izq.</option>
+            <option value="right">Der.</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs text-zinc-400">
+          TUT (s)
+          <input
+            value={input.tempoSeconds}
+            onChange={(event) => onChange({ tempoSeconds: event.target.value })}
+            inputMode="numeric"
+            placeholder="opc."
+            className="rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-3 text-white outline-none focus:border-[#CCFF00]"
+          />
+        </label>
+      </div>
+
+      <div className="mt-2 grid grid-cols-3 gap-2">
         <div className="flex gap-1">
           <button type="button" onClick={() => onAdjustWeight(-2.5)} className="flex-1 rounded-xl bg-zinc-900 py-2 text-xs font-bold text-zinc-300">
             -2.5

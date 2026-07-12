@@ -24,6 +24,9 @@ export function enqueueLogSet(params: {
   weight: number;
   reps: number;
   rpe: number | null;
+  rir?: number | null;
+  side?: string | null;
+  tempoSeconds?: number | null;
   isWarmup: boolean;
 }): { clientOperationId: string; tempSetId: string } {
   const clientOperationId = generateUUID();

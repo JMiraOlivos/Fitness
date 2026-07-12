@@ -20,6 +20,8 @@ export type RoutineExerciseRow = {
   priority: ExercisePriority | null;
   progression_rule: string | null;
   substitution_criteria: string | null;
+  superset_group: number | null;
+  set_style: string | null;
   exercises?: ExerciseRow | ExerciseRow[] | null;
 };
 
@@ -31,10 +33,15 @@ export type RoutineRow = {
   routine_exercises?: RoutineExerciseRow[];
 };
 
+export type SetSide = "both" | "left" | "right";
+
 export type SetInput = {
   weight: string;
   reps: string;
   rpe: string;
+  rir: string;
+  side: SetSide;
+  tempoSeconds: string;
   isWarmup: boolean;
 };
 
@@ -44,6 +51,9 @@ export type LocalSetLog = {
   weight: number;
   reps: number;
   rpe: number | null;
+  rir?: number | null;
+  side?: SetSide | null;
+  tempo_seconds?: number | null;
   is_warmup: boolean;
   pending?: boolean;
 };

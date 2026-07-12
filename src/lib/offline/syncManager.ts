@@ -75,6 +75,9 @@ export async function processQueue(): Promise<void> {
               weight: number;
               reps: number;
               rpe: number | null;
+              rir?: number | null;
+              side?: string | null;
+              tempoSeconds?: number | null;
               isWarmup: boolean;
             };
             const realWorkoutLogId = tempToReal[p.workoutLogId] || p.workoutLogId;
@@ -85,6 +88,9 @@ export async function processQueue(): Promise<void> {
               weight: p.weight,
               reps: p.reps,
               rpe: p.rpe,
+              rir: p.rir ?? null,
+              side: p.side ?? null,
+              tempoSeconds: p.tempoSeconds ?? null,
               isWarmup: p.isWarmup,
               clientOperationId: op.clientOperationId,
             });

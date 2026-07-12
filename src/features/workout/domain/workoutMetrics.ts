@@ -21,6 +21,9 @@ export function defaultInput(): SetInput {
     weight: "",
     reps: "",
     rpe: "8",
+    rir: "",
+    side: "both",
+    tempoSeconds: "",
     isWarmup: false,
   };
 }
