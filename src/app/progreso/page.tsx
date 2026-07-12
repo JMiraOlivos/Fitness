@@ -10,7 +10,15 @@ import { useSession } from "@/components/SessionProvider";
 import { classifyVolume, MUSCLE_GROUP_VOLUME_TARGETS, type VolumeStatus } from "@/lib/training/volumeTargets";
 import { detectFatigue } from "@/lib/training/fatigue";
 import { buildWeeklyRecommendations } from "@/lib/training/weeklyRecommendation";
+import { analyzeMovementBalance } from "@/lib/training/movementBalance";
 import { TrainingCalendar } from "@/components/TrainingCalendar";
+
+type ReadinessRow = {
+  created_at: string;
+  energy: number;
+  sleep_quality: number;
+  soreness: number;
+};
 
 type ExerciseRef = {
   id: string;
@@ -211,8 +219,13 @@ export default function ProgresoPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adherence, setAdherence] = useState<{ planned: number; completed: number } | null>(null);
+  const [readinessTrend, setReadinessTrend] = useState<ReadinessRow[]>([]);
 
   const progress = useMemo(() => buildProgress(setLogs), [setLogs]);
+  const movementBalance = useMemo(
+    () => analyzeMovementBalance(buildMuscleGroupWeeklyVolume(setLogs).map((item) => ({ muscleGroup: item.muscleGroup, sets: item.sets }))),
+    [setLogs]
+  );
   const totalVolume = useMemo(() => progress.reduce((sum, item) => sum + item.volume, 0), [progress]);
   const totalSets = useMemo(() => progress.reduce((sum, item) => sum + item.sets, 0), [progress]);
   const topExercise = progress[0];
@@ -302,6 +315,13 @@ export default function ProgresoPage() {
         setAdherence(null);
       }
 
+      const { data: readiness } = await supabase
+        .from("readiness_logs")
+        .select("created_at, energy, sleep_quality, soreness")
+        .order("created_at", { ascending: false })
+        .limit(14);
+      setReadinessTrend((readiness || []) as unknown as ReadinessRow[]);
+
       setIsLoading(false);
     }
 
@@ -358,6 +378,57 @@ export default function ProgresoPage() {
               <p key={recommendation} className="text-sm text-zinc-200">
                 {recommendation}
               </p>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {user && !isLoading && readinessTrend.length >= 2 && (
+        <section className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+          <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Recuperación reciente</p>
+          <p className="text-[11px] text-zinc-500 mt-1">Promedio de tus últimos {readinessTrend.length} check-ins de readiness (1-5).</p>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {([
+              { key: "energy", label: "Energía", higherIsBetter: true },
+              { key: "sleep_quality", label: "Sueño", higherIsBetter: true },
+              { key: "soreness", label: "Dolor musc.", higherIsBetter: false },
+            ] as const).map((metric) => {
+              const avg = readinessTrend.reduce((sum, row) => sum + Number(row[metric.key] || 0), 0) / readinessTrend.length;
+              const good = metric.higherIsBetter ? avg >= 3.5 : avg <= 2.5;
+              const bad = metric.higherIsBetter ? avg <= 2 : avg >= 4;
+              return (
+                <div key={metric.key} className="rounded-2xl border border-zinc-800 bg-black p-3">
+                  <p className="text-[10px] text-zinc-500 uppercase font-bold">{metric.label}</p>
+                  <p className={`text-xl font-black mt-1 ${good ? "text-[#CCFF00]" : bad ? "text-red-400" : "text-white"}`}>{avg.toFixed(1)}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {user && !isLoading && movementBalance.ratios.some((ratio) => ratio.ratio !== null) && (
+        <section className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+          <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Balance de patrones (7 días)</p>
+          <div className="mt-4 grid gap-3">
+            {movementBalance.ratios.filter((ratio) => ratio.ratio !== null).map((ratio) => {
+              const total = ratio.a.sets + ratio.b.sets || 1;
+              const aPct = (ratio.a.sets / total) * 100;
+              return (
+                <div key={ratio.label}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-bold text-zinc-300">{ratio.a.label} <span className="text-zinc-500">{ratio.a.sets}</span></span>
+                    <span className="font-bold text-zinc-300">{ratio.b.label} <span className="text-zinc-500">{ratio.b.sets}</span></span>
+                  </div>
+                  <div className="flex h-3 overflow-hidden rounded-full bg-zinc-900">
+                    <div className={`h-full ${ratio.warning ? "bg-amber-400" : "bg-[#CCFF00]"}`} style={{ width: `${aPct}%` }} />
+                    <div className="h-full bg-zinc-600" style={{ width: `${100 - aPct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+            {movementBalance.warnings.map((warning) => (
+              <p key={warning} className="text-xs text-amber-300">{warning}</p>
             ))}
           </div>
         </section>
