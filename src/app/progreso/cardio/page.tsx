@@ -94,16 +94,20 @@ export default function CardioPage() {
   const totalDuration = logs.reduce((s, l) => s + l.duration_seconds, 0);
   const totalDistance = logs.reduce((s, l) => s + Number(l.distance_meters || 0), 0);
 
-  if (isLoading) return <main className="min-h-screen bg-black text-white p-6 max-w-md mx-auto flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#CCFF00]" /></main>;
-
   return (
-    <main className="min-h-screen bg-black text-white p-6 pb-16 font-sans max-w-md mx-auto">
+    <main className="min-h-screen bg-black text-white p-6 pb-24 font-sans max-w-md mx-auto">
       <Link href="/progreso" className="inline-flex items-center gap-2 text-sm text-zinc-400 mb-6"><ArrowLeft className="h-4 w-4" /> Progreso</Link>
 
       <header className="mb-6">
         <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Cardio</p>
         <h1 className="text-3xl font-black tracking-tight mt-1">Sesiones de cardio</h1>
       </header>
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-[#CCFF00]" /></div>
+      )}
+      {!isLoading && (
+        <>
 
       {!user && (
         <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5">
@@ -155,6 +159,16 @@ export default function CardioPage() {
                   <span className="text-zinc-400">Distancia (km)</span>
                   <input value={form.distance} onChange={(e) => setForm((f) => ({ ...f, distance: e.target.value }))} inputMode="decimal" placeholder="Opcional" className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00]" />
                 </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-zinc-400">FC media (ppm)</span>
+                    <input value={form.heartRate} onChange={(e) => setForm((f) => ({ ...f, heartRate: e.target.value }))} inputMode="numeric" placeholder="Opcional" className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00]" />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-zinc-400">Calorías (kcal)</span>
+                    <input value={form.calories} onChange={(e) => setForm((f) => ({ ...f, calories: e.target.value }))} inputMode="numeric" placeholder="Opcional" className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00]" />
+                  </label>
+                </div>
                 <label className="grid gap-1 text-sm">
                   <span className="text-zinc-400">Notas</span>
                   <input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Opcional" className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00]" />
@@ -179,7 +193,15 @@ export default function CardioPage() {
                           <Icon className="h-4 w-4 text-[#CCFF00]" />
                           <p className="text-sm font-bold">{CARDIO_TYPES[log.type]?.label || log.type}</p>
                         </div>
-                        <p className="text-xs text-zinc-500 mt-1">{formatDate(log.created_at)} · {formatDuration(log.duration_seconds)} · {log.distance_meters ? `${log.distance_meters} km` : ""}</p>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          {[
+                            formatDate(log.created_at),
+                            formatDuration(log.duration_seconds),
+                            log.distance_meters ? `${log.distance_meters} km` : null,
+                            log.heart_rate_avg ? `${log.heart_rate_avg} ppm` : null,
+                            log.calories ? `${log.calories} kcal` : null,
+                          ].filter(Boolean).join(" · ")}
+                        </p>
                         {log.notes && <p className="text-xs text-zinc-400 mt-1">{log.notes}</p>}
                       </div>
                       <button onClick={() => void borrar(log.id)} disabled={deletingId === log.id} className="shrink-0 text-zinc-500 hover:text-red-400 p-1">
@@ -198,6 +220,8 @@ export default function CardioPage() {
               <p className="text-sm text-zinc-400 mt-2">Registra tu primera sesión de cardio.</p>
             </section>
           )}
+        </>
+      )}
         </>
       )}
     </main>

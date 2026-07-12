@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { TrendingUp } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
+import type { ActiveProgram } from "@/features/dashboard/types";
 import { AccountCard } from "@/features/dashboard/components/AccountCard";
 import { OnboardingBanner } from "@/features/dashboard/components/OnboardingBanner";
 import { ActiveProgramCard } from "@/features/dashboard/components/ActiveProgramCard";
@@ -12,19 +15,49 @@ import { CoachGenerator } from "@/features/dashboard/components/CoachGenerator";
 import { SavedRoutines } from "@/features/dashboard/components/SavedRoutines";
 import { AiFeedback } from "@/components/AiFeedback";
 
+function greetingPrefix() {
+  const hour = new Date().getHours();
+  if (hour < 6) return "Buenas noches";
+  if (hour < 13) return "Buenos días";
+  if (hour < 20) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+function displayName(user: User | null) {
+  if (!user) return null;
+  const fullName = (user.user_metadata?.full_name as string | undefined)?.trim();
+  if (fullName && !fullName.includes("@")) return fullName.split(" ")[0];
+  if (user.email) return user.email.split("@")[0];
+  return null;
+}
+
+function greetingSubtitle(activeProgram: ActiveProgram | null) {
+  if (activeProgram?.currentWeek) {
+    return `Semana ${activeProgram.currentWeek} de ${activeProgram.duration_weeks} · ${activeProgram.name}.`;
+  }
+  return "Tu entrenamiento, progreso e IA en un solo lugar.";
+}
+
 export default function Dashboard() {
   const dashboard = useDashboard();
+  const name = displayName(dashboard.user);
 
   return (
     <main className="min-h-screen bg-black text-white p-6 pb-28 font-sans max-w-md mx-auto">
       <header className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Hola, Guerrero</h1>
-          <p className="text-zinc-400">Tu entrenamiento, progreso e IA en un solo lugar.</p>
+          <h1 className="text-3xl font-black tracking-tight">
+            {name ? `${greetingPrefix()}, ${name}` : "Hola, Guerrero"}
+          </h1>
+          <p className="text-zinc-400">{greetingSubtitle(dashboard.activeProgram)}</p>
         </div>
-        <div className="w-12 h-12 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+        <Link
+          href="/perfil"
+          aria-label="Ir al perfil"
+          className="w-12 h-12 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center"
+        >
           <TrendingUp className="text-[#CCFF00] w-6 h-6" />
-        </div>
+        </Link>
       </header>
 
       <AccountCard user={dashboard.user} onSignOut={() => void dashboard.cerrarSesion()} />
