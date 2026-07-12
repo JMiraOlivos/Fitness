@@ -1,15 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { ArrowLeft, CheckCircle2, Loader2, LogIn, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type AuthMode = "login" | "signup";
 
 export default function AuthPage() {
+  return (
+    <Suspense>
+      <AuthPageInner />
+    </Suspense>
+  );
+}
+
+function AuthPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") || "/";
   const [mode, setMode] = useState<AuthMode>("signup");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -54,7 +64,7 @@ export default function AuthPage() {
 
         if (data.session) {
           setMessage("Cuenta creada correctamente. Redirigiendo...");
-          router.replace("/");
+          router.replace(nextPath);
           return;
         }
 
@@ -73,7 +83,7 @@ export default function AuthPage() {
       }
 
       setMessage("Sesión iniciada correctamente. Redirigiendo...");
-      router.replace("/");
+      router.replace(nextPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No pudimos completar la autenticación.");
     } finally {
