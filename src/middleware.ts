@@ -42,13 +42,36 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  // getUser() validates against the Auth server and, as a side effect, refreshes
+  // and rewrites rotated tokens into `response`. We keep calling it for that
+  // refresh, but it must NOT be the sole gate for the redirect: it's a network
+  // call on every navigation, and on a flaky mobile connection (or the edge
+  // runtime) a transient failure makes it return null even for a signed-in user.
+  // Redirecting on that bounced logged-in users on installed PWAs back to /auth
+  // on every page ("me pide auth pero no guarda la sesión").
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user && isProtected(request.nextUrl.pathname)) {
+  // A request that carries a Supabase auth cookie belongs to a client that signed
+  // in. Trust that presence for the redirect decision so a momentary getUser()
+  // miss doesn't eject the user — real data access is still gated by RLS
+  // server-side and by each page's own signed-out guard, and a genuinely stale
+  // cookie is cleared by getUser() (via setAll into `response`) so it self-heals
+  // on the next navigation. Only a truly anonymous request (no auth cookie at all)
+  // gets sent to /auth.
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some(({ name }) => /^sb-.*-auth-token(\.\d+)?$/.test(name));
+
+  if (!user && !hasAuthCookie && isProtected(request.nextUrl.pathname)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/auth";
     redirectUrl.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(redirectUrl);
+    const redirect = NextResponse.redirect(redirectUrl);
+    // Carry over any cookies getUser() rotated/cleared onto the redirect response
+    // so the browser and server stay in sync (Supabase SSR guidance: a freshly
+    // created response must inherit the mutated cookies).
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
 
   return response;
