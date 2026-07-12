@@ -22,6 +22,8 @@ export type Database = {
           equipment_available: string | null;
           experience_level: string | null;
           is_admin: boolean;
+          birth_year: number | null;
+          max_heart_rate: number | null;
           created_at: string;
         };
         Insert: {
@@ -34,6 +36,8 @@ export type Database = {
           equipment_available?: string | null;
           experience_level?: string | null;
           is_admin?: boolean;
+          birth_year?: number | null;
+          max_heart_rate?: number | null;
           created_at?: string;
         };
         Update: {
@@ -46,6 +50,8 @@ export type Database = {
           equipment_available?: string | null;
           experience_level?: string | null;
           is_admin?: boolean;
+          birth_year?: number | null;
+          max_heart_rate?: number | null;
           created_at?: string;
         };
         Relationships: [];
@@ -201,6 +207,8 @@ export type Database = {
           priority: string | null;
           progression_rule: string | null;
           substitution_criteria: string | null;
+          superset_group: number | null;
+          set_style: string | null;
         };
         Insert: {
           id?: string;
@@ -218,6 +226,8 @@ export type Database = {
           priority?: string | null;
           progression_rule?: string | null;
           substitution_criteria?: string | null;
+          superset_group?: number | null;
+          set_style?: string | null;
         };
         Update: {
           id?: string;
@@ -235,6 +245,8 @@ export type Database = {
           priority?: string | null;
           progression_rule?: string | null;
           substitution_criteria?: string | null;
+          superset_group?: number | null;
+          set_style?: string | null;
         };
         Relationships: [
           {
@@ -307,6 +319,9 @@ export type Database = {
           weight: number;
           reps: number;
           rpe: number | null;
+          rir: number | null;
+          side: string | null;
+          tempo_seconds: number | null;
           is_warmup: boolean;
           created_at: string;
           client_operation_id: string | null;
@@ -319,6 +334,9 @@ export type Database = {
           weight: number;
           reps: number;
           rpe?: number | null;
+          rir?: number | null;
+          side?: string | null;
+          tempo_seconds?: number | null;
           is_warmup?: boolean;
           created_at?: string;
           client_operation_id?: string | null;
@@ -331,6 +349,9 @@ export type Database = {
           weight?: number;
           reps?: number;
           rpe?: number | null;
+          rir?: number | null;
+          side?: string | null;
+          tempo_seconds?: number | null;
           is_warmup?: boolean;
           created_at?: string;
           client_operation_id?: string | null;
@@ -699,6 +720,10 @@ export type Database = {
           heart_rate_avg: number | null;
           calories: number | null;
           notes: string | null;
+          program_id: string | null;
+          workout_log_id: string | null;
+          heart_rate_max: number | null;
+          perceived_effort: number | null;
           created_at: string;
         };
         Insert: {
@@ -710,6 +735,10 @@ export type Database = {
           heart_rate_avg?: number | null;
           calories?: number | null;
           notes?: string | null;
+          program_id?: string | null;
+          workout_log_id?: string | null;
+          heart_rate_max?: number | null;
+          perceived_effort?: number | null;
           created_at?: string;
         };
         Update: {
@@ -721,11 +750,59 @@ export type Database = {
           heart_rate_avg?: number | null;
           calories?: number | null;
           notes?: string | null;
+          program_id?: string | null;
+          workout_log_id?: string | null;
+          heart_rate_max?: number | null;
+          perceived_effort?: number | null;
           created_at?: string;
         };
         Relationships: [
           {
             foreignKeyName: "cardio_logs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      daily_nutrition_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          log_date: string;
+          water_ml: number | null;
+          protein_g: number | null;
+          calories: number | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          log_date?: string;
+          water_ml?: number | null;
+          protein_g?: number | null;
+          calories?: number | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          log_date?: string;
+          water_ml?: number | null;
+          protein_g?: number | null;
+          calories?: number | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "daily_nutrition_logs_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
