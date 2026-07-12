@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Bike,
   CloudOff,
+  Droplet,
   Dumbbell,
   History,
   Home,
@@ -31,6 +32,7 @@ const navItems = [
 const moreItems = [
   { href: "/programas", label: "Programas", icon: LayoutGrid, description: "Mesociclos y planificación" },
   { href: "/progreso/cardio", label: "Cardio", icon: Bike, description: "Correr, bici, natación…" },
+  { href: "/progreso/nutricion", label: "Nutrición", icon: Droplet, description: "Agua, proteína, calorías" },
   { href: "/progreso/peso", label: "Peso corporal", icon: Scale, description: "Peso y medidas" },
   { href: "/perfil", label: "Perfil", icon: User, description: "Objetivo, equipo, lesiones" },
 ];
