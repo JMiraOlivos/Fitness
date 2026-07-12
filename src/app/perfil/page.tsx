@@ -12,6 +12,8 @@ type ProfileForm = {
   injuryNotes: string;
   equipmentAvailable: string;
   experienceLevel: string;
+  birthYear: string;
+  maxHeartRate: string;
 };
 
 const emptyForm: ProfileForm = {
@@ -19,6 +21,8 @@ const emptyForm: ProfileForm = {
   injuryNotes: "",
   equipmentAvailable: "",
   experienceLevel: "",
+  birthYear: "",
+  maxHeartRate: "",
 };
 
 export default function PerfilPage() {
@@ -45,7 +49,7 @@ export default function PerfilPage() {
 
       const { data, error: loadError } = await supabase
         .from("profiles")
-        .select("training_goal, injury_notes, equipment_available, experience_level")
+        .select("training_goal, injury_notes, equipment_available, experience_level, birth_year, max_heart_rate")
         .eq("id", userId)
         .single();
 
@@ -57,6 +61,8 @@ export default function PerfilPage() {
           injuryNotes: data.injury_notes || "",
           equipmentAvailable: data.equipment_available || "",
           experienceLevel: data.experience_level || "",
+          birthYear: String(data.birth_year ?? ""),
+          maxHeartRate: String(data.max_heart_rate ?? ""),
         });
       }
 
@@ -80,6 +86,8 @@ export default function PerfilPage() {
         injury_notes: form.injuryNotes.trim() || null,
         equipment_available: form.equipmentAvailable || null,
         experience_level: form.experienceLevel || null,
+        birth_year: form.birthYear ? Number(form.birthYear) : null,
+        max_heart_rate: form.maxHeartRate ? Number(form.maxHeartRate) : null,
       })
       .eq("id", user.id);
 
@@ -184,6 +192,31 @@ export default function PerfilPage() {
                 placeholder="Ej: molestia en el hombro derecho, evitar sentadilla libre"
                 className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00] resize-none"
               />
+            </label>
+
+            <label className="grid gap-1 text-sm">
+              <span className="text-zinc-400">Año de nacimiento</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={form.birthYear}
+                onChange={(event) => setForm((current) => ({ ...current, birthYear: event.target.value }))}
+                placeholder="Ej: 1990"
+                className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00]"
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm">
+              <span className="text-zinc-400">FC máxima medida (ppm)</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={form.maxHeartRate}
+                onChange={(event) => setForm((current) => ({ ...current, maxHeartRate: event.target.value }))}
+                placeholder="Ej: 185"
+                className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 outline-none focus:border-[#CCFF00]"
+              />
+              <span className="text-[11px] text-zinc-500">Si la conoces por un test; si no, se estima por tu edad.</span>
             </label>
 
             <button

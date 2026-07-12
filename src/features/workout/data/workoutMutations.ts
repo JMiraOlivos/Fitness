@@ -51,10 +51,13 @@ export async function logSet(params: {
   weight: number;
   reps: number;
   rpe: number | null;
+  rir?: number | null;
+  side?: string | null;
+  tempoSeconds?: number | null;
   isWarmup: boolean;
   clientOperationId?: string;
 }) {
-  return authFetch<{ id: string; set_number: number; weight: number; reps: number; rpe: number | null; is_warmup: boolean }>(
+  return authFetch<{ id: string; set_number: number; weight: number; reps: number; rpe: number | null; rir: number | null; side: string | null; tempo_seconds: number | null; is_warmup: boolean }>(
     "/api/workouts/log-set",
     params
   );

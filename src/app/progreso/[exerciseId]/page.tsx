@@ -30,6 +30,7 @@ type TrendPoint = {
   volume: number;
   maxWeight: number;
   sets: number;
+  estimatedOneRepMax: number | null;
 };
 
 type PrRecord = {
@@ -69,6 +70,7 @@ function buildTrend(logs: SetLog[]) {
       volume: 0,
       maxWeight: 0,
       sets: 0,
+      estimatedOneRepMax: null,
     };
 
     const weight = Number(log.weight || 0);
@@ -76,10 +78,62 @@ function buildTrend(logs: SetLog[]) {
     current.volume += weight * reps;
     current.maxWeight = Math.max(current.maxWeight, weight);
     current.sets += 1;
+    const oneRepMax = estimateOneRepMax(weight, reps);
+    if (oneRepMax !== null) {
+      current.estimatedOneRepMax = Math.max(current.estimatedOneRepMax ?? 0, oneRepMax);
+    }
     map.set(key, current);
   }
 
   return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key)).slice(-8);
+}
+
+// Minimal inline line chart of estimated 1RM over the recent sessions. Only sessions
+// with a valid e1RM (reps within the estimable range) are plotted.
+function OneRepMaxChart({ points }: { points: TrendPoint[] }) {
+  const series = points.filter((point) => point.estimatedOneRepMax !== null);
+  if (series.length < 2) return null;
+
+  const width = 300;
+  const height = 90;
+  const padX = 6;
+  const padY = 12;
+  const values = series.map((point) => point.estimatedOneRepMax as number);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  const coords = series.map((point, index) => {
+    const x = padX + (index / (series.length - 1)) * (width - padX * 2);
+    const y = padY + (1 - ((point.estimatedOneRepMax as number) - min) / range) * (height - padY * 2);
+    return { x, y, value: point.estimatedOneRepMax as number, label: point.label };
+  });
+
+  const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
+  const first = values[0];
+  const last = values[values.length - 1];
+  const delta = last - first;
+
+  return (
+    <section className="mb-6 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Evolución de 1RM estimado</p>
+        <span className={`text-xs font-bold ${delta > 0 ? "text-[#CCFF00]" : delta < 0 ? "text-red-400" : "text-zinc-500"}`}>
+          {delta > 0 ? "▲" : delta < 0 ? "▼" : "="} {Math.abs(Math.round(delta))} kg
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="mt-3 w-full" role="img" aria-label={`Evolución del 1RM estimado: de ${Math.round(first)} a ${Math.round(last)} kilos`}>
+        <path d={linePath} fill="none" stroke="#CCFF00" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        {coords.map((c) => (
+          <circle key={c.label} cx={c.x} cy={c.y} r={2.5} fill="#CCFF00" />
+        ))}
+      </svg>
+      <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-500">
+        <span>{coords[0].label} · {Math.round(first)} kg</span>
+        <span>{coords[coords.length - 1].label} · {Math.round(last)} kg</span>
+      </div>
+    </section>
+  );
 }
 
 export default function ExerciseProgressDetailPage() {
@@ -243,6 +297,8 @@ export default function ExerciseProgressDetailPage() {
             </div>
             <p className="text-2xl font-black mt-2">{Math.round(totalVolume)} kg</p>
           </section>
+
+          <OneRepMaxChart points={trend} />
 
           <section className="mb-6 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
             <p className="text-xs text-[#CCFF00] uppercase font-bold tracking-wider">Tendencia de volumen</p>

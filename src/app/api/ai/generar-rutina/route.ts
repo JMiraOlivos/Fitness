@@ -42,6 +42,17 @@ const rutinaSchema = z.object({
           criterioSustitucion: z
             .string()
             .describe('Cuándo y por qué sustituir este ejercicio (ej: dolor, falta de equipo)'),
+          grupoSuperserie: z
+            .number()
+            .int()
+            .min(1)
+            .max(20)
+            .nullish()
+            .describe('Si este ejercicio va en superserie, el número de grupo (mismo número = misma superserie, ej: A1 y A2 comparten grupo 1). null si es una serie normal.'),
+          estiloSerie: z
+            .enum(['normal', 'dropset', 'rest_pause', 'myo_reps', 'amrap'])
+            .nullish()
+            .describe('Estilo de las series de trabajo. Usa "normal" salvo que una técnica de intensidad aporte (dropset/rest_pause/myo_reps/amrap).'),
         })
       ),
     })
@@ -137,7 +148,11 @@ export async function POST(req: Request) {
       Para cada ejercicio debes entregar siempre, además de series/reps/notas: descanso en segundos,
       RPE objetivo, RIR objetivo, tempo, patrón de movimiento, prioridad dentro de la sesión
       (principal/accesorio/aislamiento/correctivo), una regla concreta para progresar la próxima vez,
-      y un criterio de sustitución si el usuario siente molestia o no tiene el equipo.`,
+      y un criterio de sustitución si el usuario siente molestia o no tiene el equipo.
+      Cuando tenga sentido (eficiencia de tiempo o intensidad), agrupa ejercicios en superseries usando
+      grupoSuperserie (el mismo número en dos o más ejercicios los vuelve una superserie A1/A2) o marca un
+      estiloSerie de intensidad (dropset/rest_pause/myo_reps/amrap); si no aporta, deja grupoSuperserie en null
+      y estiloSerie en "normal".`,
       prompt: `Genera una rutina de entrenamiento con las siguientes especificaciones actuales:
       - Días disponibles esta semana: ${diasDisponibles}
       - Enfoque del entrenamiento: ${enfoque}

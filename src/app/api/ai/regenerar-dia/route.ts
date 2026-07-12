@@ -35,6 +35,17 @@ const diaSchema = z.object({
       criterioSustitucion: z
         .string()
         .describe("Cuándo y por qué sustituir este ejercicio (ej: dolor, falta de equipo)"),
+      grupoSuperserie: z
+        .number()
+        .int()
+        .min(1)
+        .max(20)
+        .nullish()
+        .describe("Número de grupo de superserie (mismo número = misma superserie); null si es serie normal."),
+      estiloSerie: z
+        .enum(["normal", "dropset", "rest_pause", "myo_reps", "amrap"])
+        .nullish()
+        .describe('Estilo de las series de trabajo; "normal" salvo que una técnica de intensidad aporte.'),
     })
   ),
 });

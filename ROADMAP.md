@@ -366,17 +366,17 @@ Un análisis externo (`roadmap_vnext_fitness_app.md`, 2026-07-06) propuso 19 fas
 - ✅ AI: `generar-rutina` y `regenerar-dia` reciben listas de favoritos ("prefiérelos") y evitados ("NUNCA los incluyas") en el prompt.
 - ✅ `getUserExercisePreferences()` en supabaseServer con join a exercises para nombres.
 
-## Fase vNext 16 — Cardio, movilidad y salud general
+## Fase vNext 16 — Cardio, movilidad y salud general 🟡 (MVP completo, 2026-07-07)
 
-⬜ Pendiente, no existe. Coincide con la evaluación del análisis original: expansión opcional, no crítica para el foco actual de fuerza/hipertrofia. Sin cambios de prioridad.
+✅ MVP de cardio implementado (vNext+ P3 item 12): tabla `cardio_logs`, pantalla `/progreso/cardio`, tipos predefinidos y totales semanales. **Sigue pendiente** la integración real del cardio al plan/mesociclo, zonas de FC y movilidad — recontextualizado en el **Roadmap vNext++** (U9, U10) más abajo. La observación original ("expansión opcional") ya no aplica: el cardio existe pero está desintegrado y semi-oculto.
 
-## Fase vNext 17 — Coach IA proactivo
+## Fase vNext 17 — Coach IA proactivo ✅ (completa, 2026-07-07)
 
-⬜ Pendiente, no existe tabla `coach_recommendations`. El insight post-entrenamiento con tendencia de 4 sesiones (Fase 8) y `buildWeeklyRecommendations` (Fase vNext 7, ya completa) son la base sobre la que esto se construye — falta persistir esas recomendaciones como entidad propia (con `is_read`, severidad, etc.) y mostrarlas proactivamente en el Home en vez de solo en `/progreso`.
+✅ Completa (vNext+ P0 item 1): tabla `coach_recommendations` con RLS, persistencia vía `POST /api/coach/recommendations`, badge de no leídas en `AppNavigation`, tarjeta en el Home y `POST /api/coach/recommendations/read`.
 
-## Fase vNext 18 — Admin/calidad de producto
+## Fase vNext 18 — Admin/calidad de producto ✅ (completa, 2026-07-07)
 
-⬜ Pendiente, no existe. Baja prioridad — depende de que exista contenido que curar (Fase vNext 4) y observabilidad de IA que auditar (Fase vNext 10) antes de que una pantalla `/admin` tenga datos reales que mostrar.
+✅ Completa (vNext+ P3 item 13): pantalla `/admin/ai` gateada por `profiles.is_admin` con tabla filtrable de `ai_generations`. Junto con `/admin/exercises` (vNext 4), cubre la curación de contenido y la auditoría de IA que esta fase pedía.
 
 ---
 
@@ -409,8 +409,8 @@ Con esto queda cerrado el bloque P1 completo del roadmap vNext.
 1. ~~**vNext 4 (resto) — Aliases, verificación y `/admin/exercises`.**~~ — ✅ completa (2026-07-07): migraciones de curación + matching de aliases, `profiles.is_admin`, pantalla `/admin/exercises`.
 2. ~~**vNext 14 (resto) — Cola offline + sync de series.**~~ — ✅ completa (2026-07-07): IndexedDB + sync automático + idempotencia API + UI optimista.
 3. ~~**vNext 15 — Personalización avanzada.**~~ — ✅ completa (2026-07-07): favoritos/evitados + UI estrella + wireado a prompts de IA.
-4. **vNext 17 — Coach IA proactivo.** Re-priorizado en vNext+ (ver abajo) como P0-1, con scope concreto.
-5. **vNext 13, 16, 18 — Contenido técnico, cardio/movilidad, admin.** Sin cambios respecto al análisis original: baja urgencia.
+4. ~~**vNext 17 — Coach IA proactivo.**~~ — ✅ completa (2026-07-07): recontextualizada y cerrada en vNext+ P0 (ver arriba).
+5. ~~**vNext 16, 18 — Cardio/movilidad (MVP), admin de IA.**~~ — ✅ completa (2026-07-07): cardio MVP (`/progreso/cardio`) y `/admin/ai`, cerradas en vNext+ P3. Queda **vNext 13 (contenido técnico)** como único diferido (esfuerzo de contenido, no de ingeniería).
 
 ---
 
@@ -418,34 +418,30 @@ Con esto queda cerrado el bloque P1 completo del roadmap vNext.
 
 Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases pendientes del vNext original (17, 13, 16, 18) se recontextualizan acá con scope concreto; el resto son ideas nuevas detectadas al auditar el código.
 
-## P0 — Lo que más urge
+## P0 — Lo que más urge ✅ (completa, 2026-07-07)
 
-### 1. vNext 17 — Coach IA proactivo (pendiente del roadmap original)
+### 1. vNext 17 — Coach IA proactivo ✅
 
 **Objetivo:** que la app le diga al usuario qué hacer sin que tenga que ir a `/progreso` a buscar recomendaciones.
 
-**Alcance:**
-- Tabla `coach_recommendations` (user_id, category, severity, message, is_read, created_at, metadata jsonb) con RLS.
-- Persistir las recomendaciones que hoy `buildWeeklyRecommendations()` genera de forma efímera (volumen bajo/alto por grupo, fatiga, adherencia).
-- Generar una recomendación nueva al finalizar cada entrenamiento (reutilizando `detectFatigue` + `classifyVolume` + adherencia ya existentes), y al inicio de semana si no entrenó.
-- Badge de notificaciones no leídas en el ícono del Home (AppNavigation).
-- Tarjeta "Recomendaciones del coach" en el Home, arriba de QuickActions, con dismiss/marcar como leído.
-- Endpoint `POST /api/coach/recommendations/read` para marcar leído.
+**Alcance (completado):**
+- ✅ Tabla `coach_recommendations` (user_id, category, severity, message, is_read, created_at, metadata jsonb) con RLS — migración `20260719_add_coach_recommendations.sql`.
+- ✅ Persiste las recomendaciones que `buildWeeklyRecommendations()` genera (volumen bajo/alto por grupo, fatiga, adherencia) vía `POST /api/coach/recommendations`, que recalcula desde `set_logs` de los últimos 7 días y reutiliza `classifyVolume`/`detectFatigue`.
+- ✅ Badge de recomendaciones no leídas en el ícono de Inicio de `AppNavigation` (`fetchUnreadCoachCount`).
+- ✅ Tarjeta "Recomendaciones del coach" en el Home con dismiss/marcar como leído.
+- ✅ Endpoint `POST /api/coach/recommendations/read` para marcar leído.
 
-**Fundamento:** ya existe `src/lib/training/weeklyRecommendation.ts` con la lógica, `ai_generations` para trazabilidad, y fatiga/adherencia/volumen cableados en `/progreso`. Falta solo persistir y mostrar proactivamente. Esfuerzo: medio. Impacto: alto (cierra el loop "coach inteligente").
+**Fundamento:** reutiliza `src/lib/training/weeklyRecommendation.ts` + `ai_generations` + fatiga/adherencia/volumen ya cableados en `/progreso`. Cierra el loop "coach inteligente".
 
-### 2. Tests E2E con Playwright
+### 2. Tests E2E con Playwright ✅
 
 **Objetivo:** tener cobertura del flujo principal de punta a punta, no solo unitarios + integración.
 
-**Alcance:**
-- Instalar Playwright como devDependency.
-- Flujo completo: signup → onboarding (wizard) → generar rutina → guardar → iniciar entrenamiento → loguear series → finalizar → ver historial → ver progreso.
-- Flujo de mesociclos: crear programa → generar semana → ver en dashboard.
-- Correr contra Postgres local + auth shim (mismo enfoque que `rpc.integration.test.ts`), sin depender de Supabase Cloud.
-- Agregar job de E2E al CI (`.github/workflows/ci.yml`).
-
-**Fundamento:** 50 tests unitarios + 22 de integración, pero **cero** tests end-to-end. La arquitectura por features (Fase vNext 9) ya está consolidada. Esfuerzo: alto. Impacto: alto (previene regresiones en el camino crítico).
+**Alcance (completado):**
+- ✅ `@playwright/test` como devDependency + `playwright.config.ts` (proyecto chromium, `webServer` que levanta `npm start` en CI con placeholders de env).
+- ✅ `e2e/smoke.spec.ts` con 11 tests del camino crítico (arranque de la app, auth gate, navegación, estados no-autenticados de las páginas clave).
+- ✅ Job `e2e` en `.github/workflows/ci.yml` (`npx playwright install --with-deps chromium` + `npm run test:e2e`).
+- Nota de alcance: los E2E cubren el estado no-autenticado y la navegación estructural; el flujo autenticado completo (signup → generar → entrenar → finalizar) sigue bloqueado por el mismo egress a Supabase que el resto del repo, y se completará contra un proyecto de staging cuando exista.
 
 ---
 
@@ -488,7 +484,9 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 ## P2 — Deuda técnica y robustez ✅ (completa, 2026-07-07)
 
-### 6. Exercise substitution audit log
+### 6. Exercise substitution audit log ✅
+
+> Implementado (migración `20260721_add_exercise_substitutions.sql` + insert en `workoutMutations.ts`).
 
 **Objetivo:** no perder el historial de qué ejercicio fue sustituido por cuál.
 
@@ -501,7 +499,9 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 **Fundamento:** una tabla + un INSERT adicional en el flujo existente. Previene pérdida de datos irreversible. Esfuerzo: bajo. Impacto: medio (integridad de datos).
 
-### 7. React Error Boundaries
+### 7. React Error Boundaries ✅
+
+> Implementado (`src/components/ErrorBoundary.tsx`).
 
 **Objetivo:** que un crash en un componente no tumbe toda la página.
 
@@ -517,7 +517,9 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 **Fundamento:** es un solo componente + 3 wrappers en layouts/páginas. La diferencia entre "app que crashea" y "app que se recupera" es enorme en percepción de calidad. Esfuerzo: bajo. Impacto: alto.
 
-### 8. Squash de migraciones
+### 8. Squash de migraciones ✅
+
+> Implementado (`scripts/squash-migrations.mjs` → `supabase/schema_full.sql`).
 
 **Objetivo:** reducir el tiempo de setup para entornos nuevos (CI, staging, otro dev).
 
@@ -531,7 +533,9 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 **Fundamento:** no cambia comportamiento, solo velocidad de setup. Esfuerzo: bajo. Impacto: medio (DX y velocidad de CI).
 
-### 9. Server Components para carga inicial
+### 9. Server Components para carga inicial 🟡 (parcial)
+
+> Parcial: `/historial` migrado a Server Component con `<Suspense>`. **Falta** migrar `/progreso/page.tsx` y `/entrenar/[routineId]/page.tsx`, que siguen siendo `"use client"` con fetch client-side y spinner. Ver "Pendientes reales" al final del documento.
 
 **Objetivo:** reducir el LCP (Largest Contentful Paint) en páginas de datos.
 
@@ -545,7 +549,9 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 **Fundamento:** la arquitectura por features (vNext 9) ya separó queries de componentes. El patrón RSC + client component es el modelo canónico de Next.js 14. Esfuerzo: medio. Impacto: medio (percepción de velocidad).
 
-### 10. Export de datos del usuario
+### 10. Export de datos del usuario ✅
+
+> Implementado (`GET /api/user/export`).
 
 **Objetivo:** cumplir con portabilidad de datos (GDPR/CCPA) y darle poder al usuario avanzado.
 
@@ -563,7 +569,9 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 ## P3 — Expansión de alcance ✅ (completa, 2026-07-07)
 
-### 11. Warm-up dinámico generado por IA
+### 11. Warm-up dinámico generado por IA ✅
+
+> Implementado (`POST /api/ai/generar-calentamiento` + UI en `/entrenar/[routineId]`).
 
 **Objetivo:** que el usuario no entre frío al entrenamiento.
 
@@ -575,21 +583,25 @@ Propuestas nuevas tras revisión completa del repo contra el roadmap. Las fases 
 
 **Fundamento:** mismo pipeline de Gemini ya existente, scope reducido (no requiere migraciones). Esfuerzo: bajo. Impacto: medio (percepción de "app completa").
 
-### 12. vNext 16 — Cardio y movilidad (versión ligera)
+### 12. vNext 16 — Cardio y movilidad (versión ligera) ✅
+
+> Implementado (MVP de cardio, migración `20260722_add_cardio_logs.sql` + pantalla `/progreso/cardio`).
 
 **Objetivo:** que la app no sea solo fuerza/hipertrofia.
 
-**Alcance inicial (MVP de cardio):**
-- Tabla `cardio_logs` (user_id, type, duration_seconds, distance_meters nullable, heart_rate_avg nullable, calories nullable, notes, created_at) con RLS.
-- Formulario simple en `/progreso` o en una ruta nueva `/cardio` para loguear sesión de cardio.
-- Lista de sesiones recientes con totales semanales (duración, distancia).
-- Tipos predefinidos: running, cycling, walking, swimming, rowing, other.
+**Alcance completado (MVP de cardio):**
+- ✅ Tabla `cardio_logs` (user_id, type, duration_seconds, distance_meters nullable, heart_rate_avg nullable, calories nullable, notes, created_at) con RLS.
+- ✅ Formulario en `/progreso/cardio` para loguear sesión de cardio.
+- ✅ Lista de sesiones recientes con totales semanales (duración, distancia).
+- ✅ Tipos predefinidos: running, cycling, walking, swimming, rowing, other.
 
-**Diferido:** planes de cardio, integración con wearables, zonas de frecuencia cardíaca.
+**Diferido (sigue pendiente — ver "Roadmap vNext++ — Cardio y coaching integrado"):** cardio como parte del plan/mesociclo (no solo un log aislado), zonas de frecuencia cardíaca, integración con wearables, cardio+fuerza en el mismo día, recomendaciones de coach sobre cardio.
 
 **Fundamento:** la app ya tiene `body_measurements` — el cardio es el complemento natural. Esfuerzo: medio. Impacto: medio (expande el público objetivo).
 
-### 13. vNext 18 — Admin panel de IA (scope concreto)
+### 13. vNext 18 — Admin panel de IA (scope concreto) ✅
+
+> Implementado (`/admin/ai`, gateado por `profiles.is_admin`).
 
 **Objetivo:** que un admin pueda auditar la calidad de las generaciones de IA sin queries SQL manuales.
 
@@ -611,3 +623,83 @@ Cosas detectadas durante la revisión del repo que no justifican una fase propia
 - **Sin `robots.txt` ni `sitemap.xml`**: si la app se indexa, conviene tenerlos. Trivial de agregar en `public/`.
 - **Sin página 404 customizada**: Next.js sirve la default. Una `not-found.tsx` con el diseño de la app (`bg-black`, `#CCFF00`, link al Home) es 10 líneas.
 - **Sin `middleware.ts` para rutas protegidas**: hoy cada página chequea `user` client-side y muestra "Inicia sesión". Un middleware que redirija a `/auth` si no hay sesión en rutas que requieren auth (`/entrenar`, `/historial`, `/progreso`, `/programas`, `/perfil`, `/admin`) mejoraría UX y seguridad. Dejar `/` y `/auth` como públicas.
+
+---
+
+# Roadmap vNext++ — UI/UX y coaching integrado (2026-07-12)
+
+Todas las fases funcionales están cerradas; lo que sigue son **oportunidades de mejora** detectadas en una auditoría de UI/UX y funcionalidades de entrenamiento sobre el repo real. El patrón es claro: la app tiene **motores de coaching sólidos** (progresión, mesociclos, readiness, fatiga, volumen MEV/MRV, PRs, deload adaptativo) pero (a) varias features ya construidas están **escondidas o inalcanzables** desde la navegación, y (b) el modelo de "entrenador" está incompleto en **cardio, recuperación y prescripción avanzada**.
+
+**Leyenda de esfuerzo:** 🟢 bajo · 🟡 medio · 🔴 alto.
+
+## P0 — Quick wins de UI/UX (alto impacto, bajo esfuerzo)
+
+### U1. Cardio es una ruta huérfana 🟢
+`/progreso/cardio` no tiene **ningún enlace entrante** en toda la app (`grep href` sobre `cardio` = 0). La pantalla existe y funciona, pero solo se llega escribiendo la URL. Añadir una tarjeta/enlace desde `/progreso` (y idealmente desde la nav — ver U3). Es el ejemplo más claro de "feature construida que el usuario no puede usar".
+
+### U2. Programas/Mesociclos casi inalcanzables 🟢🟡
+No hay entrada a `/programas` (lista) desde el dashboard ni desde la nav. Solo se llega a un programa concreto vía `ActiveProgramCard`, que se renderiza **únicamente si hay programa activo**. Sin programa activo, toda la funcionalidad de mesociclos (planificar semana, generar semana N, deload adaptativo) queda oculta. Falta un punto de entrada estable a `/programas`.
+
+### U3. La nav inferior no cubre el modelo mental 🟡
+`AppNavigation.tsx` tiene 4 tabs (Inicio/Entrenar/Historial/Progreso). Cardio, Peso corporal, Programas y Perfil quedan escondidos bajo sub-rutas o iconos chicos (Perfil es solo un engranaje en `AccountCard`). Falta un 5º tab o un menú "Más" que agrupe Programas/Cardio/Peso/Perfil. Además el indicador offline se inyecta **dentro** de la barra de 4 tabs y descuadra el layout cuando aparece.
+
+### U4. Cardio no captura campos que la tabla ya soporta 🟢
+`cardio_logs` tiene `heart_rate_avg` y `calories`, y el estado del form los declara, pero **no se renderiza ningún input** para FC ni calorías: siempre se guardan `null`. Datos que el modelo ya admite se están perdiendo.
+
+### U5. Vibración/sonido al terminar el descanso 🟢
+`RestTimerBanner` solo muestra cuenta atrás visual. El usuario suele tener el móvil bloqueado entre series → no se entera de que terminó. `navigator.vibrate` (best-effort, ya usado en otra parte de la app) cierra el gap con poco código. Alto impacto ergonómico.
+
+### U6. Dashboard genérico, no usa el perfil 🟢
+`page.tsx` saluda "Hola, Guerrero" hardcodeado pese a haber perfil persistente (nombre, objetivo, nivel). Personalizar el saludo y mostrar el día activo del mesociclo es trivial y sube la sensación de "app hecha para mí".
+
+### U7. Gráfico de evolución de e1RM 🟢
+`estimateOneRepMax` ya se calcula y muestra por ejercicio, pero no hay **curva de e1RM en el tiempo** en `/progreso/[exerciseId]`. Es la métrica de fuerza más motivadora; el dato ya existe, solo falta la visualización.
+
+## P1 — Estratégico: cerrar el modelo de entrenador (alto impacto, mayor esfuerzo)
+
+### U8. Concepto de "Hoy / entrenamiento planificado" 🟡
+`/entrenar` es una lista plana de rutinas ordenadas por `created_at`. Aunque el programa tiene `week_number`/`day_of_week`, el dashboard nunca dice "hoy toca Día X" ni resalta la siguiente sesión del mesociclo. El usuario tiene que recordar qué le toca. Un card "Tu entrenamiento de hoy" en el Home cierra el loop de planificación que los mesociclos ya habilitan a nivel de datos.
+
+### U9. Cardio integrado al plan (no un log aislado) 🔴
+`cardio_logs` es una tabla aislada, sin relación con `routines`/`programs`/`workout_logs`. No existe "día de acondicionamiento" dentro de un mesociclo, ni cardio+fuerza en la misma sesión, ni el cardio cuenta para fatiga/recuperación/adherencia. Hoy es un cuaderno separado; para ser "coach de verdad", el cardio debe modelarse como un tipo de bloque/rutina dentro de la programación. **Este es el gap central de la observación del usuario sobre cardio.**
+
+### U10. Zonas de frecuencia cardíaca 🟡
+Solo se guarda `heart_rate_avg` como número suelto. Falta FC máx (fórmula edad-based con el perfil), zonas Z1–Z5, tiempo en zona y objetivo por sesión — la base para prescribir cardio en serio. Depende de U4 (capturar FC) como primer paso.
+
+### U11. Logging coherente RPE/RIR 🟢🟡
+La prescripción soporta `target_rir` y se muestra en la tarjeta, pero `SetLogger` solo captura **RPE**. Se prescribe en RIR y se mide en RPE, sin poder elegir. Permitir registrar en la misma escala que se prescribió da coherencia al feedback de progresión.
+
+### U12. Panel de recuperación (readiness en el tiempo) 🟡
+El readiness (energía/sueño/dolor muscular/articular) se captura al iniciar y se guarda en `readiness_logs`, pero **no hay panel de tendencia** en `/progreso`: los datos se recogen y se descartan. Una tendencia de sueño/energía/soreness alimentaría el deload adaptativo con una señal real de recuperación, no solo de fatiga por RPE.
+
+### U13. Supersets / dropsets / circuitos 🔴
+`routine_exercises` no tiene `superset_group`/`block` y la UI renderiza una lista lineal. No se puede prescribir A1/A2, dropsets ni series al fallo con back-off — limita programación de hipertrofia y entrenamientos tiempo-eficientes.
+
+## P2 — Refinamientos de coaching y consistencia
+
+### U14. Fatiga sobre 3–4 sesiones (no solo 2) 🟢🟡
+`fatigue.ts` compara solo las 2 últimas sesiones (RPE↑ + volumen↓): frágil ante una mala sesión aislada (falso positivo). Una media móvil o pendiente sobre 3–4 sesiones daría una señal más robusta que alimenta el deload adaptativo de `mesocycle.ts`.
+
+### U15. Balance por patrón de movimiento 🟡
+`volumeTargets.ts` clasifica volumen por `target_muscle` (MEV/MRV), pero ya existe `movement_pattern` sin usar para balance empuje/tracción y rodilla/cadera — un chequeo clásico de programación que previene desequilibrios.
+
+### U16. Tempo real / TUT y unilateralidad 🟡
+`tempo` se prescribe y muestra pero no se mide (dato decorativo). Tampoco hay logging por lado en ejercicios unilaterales (`lunge`/`carry`/`split`), donde detectar asimetrías izq/der es prevención de lesiones básica.
+
+### U17. Consistencia de estados de carga/accesibilidad 🟢
+`/progreso/cardio` usa un loader a pantalla completa (sin header) mientras que `/progreso` usa skeleton dentro del layout — patrón inconsistente. Además, varios botones icon-only sin `aria-label`, texto `text-[10px]` por debajo de target táctil cómodo, y contraste bajo en la nav inactiva.
+
+### U18. Nutrición / hidratación mínima 🟡
+No hay tracking de agua ni proteína/calorías objetivo, pese a que el perfil ya tiene peso corporal y `body_measurements`. Un mínimo de hidratación/proteína diaria cerraría el círculo del coaching (baja prioridad, expansión de alcance).
+
+---
+
+## Pendientes reales (resumen ejecutivo, 2026-07-12)
+
+Con todo lo anterior actualizado, lo único genuinamente **abierto** en el repo es:
+
+1. **Bonus — correcciones chicas** (todas sin hacer, bajo esfuerzo): `middleware.ts` para rutas protegidas, `not-found.tsx` (404 con diseño propio), `robots.txt`/`sitemap.xml`, `.env.local` incompleto (config, no código).
+2. **Fase vNext 9 / item 9 (RSC) — parcial**: `/historial` migrado a Server Component; falta `/progreso` y `/entrenar/[routineId]`.
+3. **Tests E2E autenticados**: los smoke tests cubren el estado no-autenticado y navegación; el flujo autenticado completo espera un proyecto de staging (bloqueo de egress a Supabase en el sandbox).
+4. **vNext 13 — Contenido técnico por ejercicio**: diferido, es esfuerzo de contenido, no de ingeniería.
+5. **Roadmap vNext++ (esta sección)**: oportunidades de UI/UX y coaching integrado — ninguna es un bug, son mejoras. Prioridad sugerida: empezar por P0 (U1–U7, quick wins que exponen features ya construidas) antes de invertir en las estratégicas (U8–U13).

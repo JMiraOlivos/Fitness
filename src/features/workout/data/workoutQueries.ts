@@ -22,6 +22,8 @@ export async function fetchRoutine(routineId: string) {
         priority,
         progression_rule,
         substitution_criteria,
+        superset_group,
+        set_style,
         exercises (
           id,
           name,

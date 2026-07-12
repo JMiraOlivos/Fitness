@@ -492,6 +492,9 @@ export function useWorkoutSession(routineId: string) {
       const weight = Number(currentInput.weight);
       const reps = Number.parseInt(currentInput.reps, 10);
       const rpe = currentInput.rpe ? Number.parseFloat(currentInput.rpe) : null;
+      const rir = currentInput.rir ? Number.parseFloat(currentInput.rir) : null;
+      const side = currentInput.side && currentInput.side !== "both" ? currentInput.side : null;
+      const tempoSeconds = currentInput.tempoSeconds ? Number.parseInt(currentInput.tempoSeconds, 10) : null;
       const isWarmup = currentInput.isWarmup;
 
       if (!Number.isFinite(weight) || weight < 0) {
@@ -504,6 +507,10 @@ export function useWorkoutSession(routineId: string) {
 
       if (rpe !== null && (!Number.isFinite(rpe) || rpe < 1 || rpe > 10 || Math.round(rpe * 2) !== rpe * 2)) {
         throw new Error("El RPE debe estar entre 1 y 10, en incrementos de 0.5.");
+      }
+
+      if (rir !== null && (!Number.isFinite(rir) || rir < 0 || rir > 5)) {
+        throw new Error("El RIR debe estar entre 0 y 5.");
       }
 
       const logId = await ensureWorkoutLog();
@@ -520,6 +527,9 @@ export function useWorkoutSession(routineId: string) {
           weight,
           reps,
           rpe,
+          rir,
+          side,
+          tempoSeconds,
           isWarmup,
         });
 
@@ -529,6 +539,9 @@ export function useWorkoutSession(routineId: string) {
           weight: Number(data.weight),
           reps: Number(data.reps),
           rpe: data.rpe === null ? null : Number(data.rpe),
+          rir: data.rir === null ? null : Number(data.rir),
+          side: (data.side as LocalSetLog["side"]) ?? null,
+          tempo_seconds: data.tempo_seconds === null ? null : Number(data.tempo_seconds),
           is_warmup: Boolean(data.is_warmup),
         };
       } catch {
@@ -539,6 +552,9 @@ export function useWorkoutSession(routineId: string) {
           weight,
           reps,
           rpe,
+          rir,
+          side,
+          tempoSeconds,
           isWarmup,
         });
 
@@ -548,6 +564,9 @@ export function useWorkoutSession(routineId: string) {
           weight,
           reps,
           rpe,
+          rir,
+          side,
+          tempo_seconds: tempoSeconds,
           is_warmup: isWarmup,
           pending: true,
         };
@@ -567,6 +586,7 @@ export function useWorkoutSession(routineId: string) {
           ...defaultInput(),
           weight: currentInput.weight,
           rpe: currentInput.rpe,
+          side: currentInput.side,
         },
       }));
 

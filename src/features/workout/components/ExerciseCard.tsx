@@ -80,6 +80,15 @@ export function ExerciseCard({
     .filter(Boolean)
     .join(" · ");
 
+  const SET_STYLE_LABELS: Record<string, string> = {
+    dropset: "Dropset",
+    rest_pause: "Rest-pause",
+    myo_reps: "Myo-reps",
+    amrap: "AMRAP",
+  };
+  const supersetLabel = item.superset_group ? `Superserie ${String.fromCharCode(64 + item.superset_group)}` : null;
+  const setStyleLabel = item.set_style && item.set_style !== "normal" ? SET_STYLE_LABELS[item.set_style] ?? null : null;
+
   return (
     <article
       ref={cardRef}
@@ -89,7 +98,15 @@ export function ExerciseCard({
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-[#CCFF00] font-bold uppercase">Ejercicio {item.order_index}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs text-[#CCFF00] font-bold uppercase">Ejercicio {item.order_index}</p>
+            {supersetLabel && (
+              <span className="rounded-full bg-[#CCFF00]/15 px-2 py-0.5 text-[10px] font-black text-[#CCFF00]">{supersetLabel}</span>
+            )}
+            {setStyleLabel && (
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-black text-amber-300">{setStyleLabel}</span>
+            )}
+          </div>
           <div className="flex items-center gap-2 mt-1">
             <h2 className="text-xl font-black">{exercise?.name || "Ejercicio"}</h2>
             <button

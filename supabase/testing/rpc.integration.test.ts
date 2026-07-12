@@ -485,3 +485,109 @@ describe("exercise catalog curation", () => {
     expect(rows[0].canonical_name).toBe("Sentadilla");
   });
 });
+
+describe("supersets and set styles (vNext++ U13)", () => {
+  it("persists superset_group and set_style through save_ai_routine", async () => {
+    const userId = await createUser("superset-owner@example.com");
+
+    const rutina = {
+      titulo: "Día superserie",
+      descripcion: "A1/A2",
+      ejercicios: [
+        { nombre: "Press banca sup", musculoObjetivo: "Pecho", equipamiento: "Barra", seriesObjetivo: 3, repeticionesObjetivo: "10", grupoSuperserie: 1, estiloSerie: "normal" },
+        { nombre: "Remo sup", musculoObjetivo: "Espalda", equipamiento: "Barra", seriesObjetivo: 3, repeticionesObjetivo: "10", grupoSuperserie: 1, estiloSerie: "dropset" },
+      ],
+    };
+
+    const routineId = await saveRoutine(userId, rutina);
+
+    const { rows } = await client.query(
+      `select re.superset_group, re.set_style
+       from public.routine_exercises re where re.routine_id = $1 order by re.order_index`,
+      [routineId]
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[0].superset_group).toBe(1);
+    expect(rows[1].superset_group).toBe(1);
+    expect(rows[1].set_style).toBe("dropset");
+  });
+
+  it("rejects an unknown set_style", async () => {
+    const userId = await createUser("superset-bad-style@example.com");
+    await expect(
+      asUser(userId, () =>
+        client.query(
+          `insert into public.routine_exercises (routine_id, exercise_id, order_index, set_style)
+           values (gen_random_uuid(), gen_random_uuid(), 1, 'no_existe')`
+        )
+      )
+    ).rejects.toThrow();
+  });
+});
+
+describe("daily_nutrition_logs RLS (vNext++ U18)", () => {
+  it("lets a user upsert and read their own nutrition log", async () => {
+    const userId = await createUser("nutrition-owner@example.com");
+
+    await asUser(userId, () =>
+      client.query(
+        `insert into public.daily_nutrition_logs (user_id, log_date, water_ml, protein_g)
+         values ($1, '2026-07-12', 2000, 140)`,
+        [userId]
+      )
+    );
+
+    const { rows } = await asUser(userId, () =>
+      client.query("select water_ml, protein_g from public.daily_nutrition_logs where user_id = $1", [userId])
+    );
+    expect(rows[0].water_ml).toBe(2000);
+    expect(Number(rows[0].protein_g)).toBe(140);
+  });
+
+  it("enforces one row per user per day", async () => {
+    const userId = await createUser("nutrition-unique@example.com");
+    await asUser(userId, () =>
+      client.query(`insert into public.daily_nutrition_logs (user_id, log_date, water_ml) values ($1, '2026-07-12', 1000)`, [userId])
+    );
+    await expect(
+      asUser(userId, () =>
+        client.query(`insert into public.daily_nutrition_logs (user_id, log_date, water_ml) values ($1, '2026-07-12', 1500)`, [userId])
+      )
+    ).rejects.toThrow();
+  });
+
+  it("does not let a user read another user's nutrition log", async () => {
+    const ownerId = await createUser("nutrition-owner2@example.com");
+    const intruderId = await createUser("nutrition-intruder@example.com");
+    await asUser(ownerId, () =>
+      client.query(`insert into public.daily_nutrition_logs (user_id, log_date, calories) values ($1, '2026-07-12', 2500)`, [ownerId])
+    );
+
+    const { rows } = await asUser(intruderId, () =>
+      client.query("select * from public.daily_nutrition_logs where user_id = $1", [ownerId])
+    );
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe("cardio planning (vNext++ U9)", () => {
+  it("links a cardio session to a program and reads it back under RLS", async () => {
+    const userId = await createUser("cardio-plan@example.com");
+    const programId = await createProgram(userId, { name: "Base + cardio" });
+
+    await asUser(userId, () =>
+      client.query(
+        `insert into public.cardio_logs (user_id, type, duration_seconds, program_id, perceived_effort, heart_rate_max)
+         values ($1, 'running', 1800, $2, 7, 175)`,
+        [userId, programId]
+      )
+    );
+
+    const { rows } = await asUser(userId, () =>
+      client.query("select program_id, perceived_effort, heart_rate_max from public.cardio_logs where user_id = $1", [userId])
+    );
+    expect(rows[0].program_id).toBe(programId);
+    expect(rows[0].perceived_effort).toBe(7);
+    expect(rows[0].heart_rate_max).toBe(175);
+  });
+});
