@@ -13,6 +13,8 @@ type ExportData = {
   exercise_preferences: unknown[];
   programs: unknown[];
   personal_records: unknown[];
+  strava_activities: unknown[];
+  strava_hr_streams: unknown[];
 };
 
 async function collectUserData(auth: NonNullable<OptionalAuth>): Promise<ExportData> {
@@ -31,6 +33,10 @@ async function collectUserData(auth: NonNullable<OptionalAuth>): Promise<ExportD
     { key: "exercise_preferences", query: supabase.from("user_exercise_preferences").select("*").eq("user_id", user.id).order("created_at", { ascending: false }) },
     { key: "programs", query: supabase.from("programs").select("*").eq("user_id", user.id).order("created_at", { ascending: false }) },
     { key: "personal_records", query: supabase.from("personal_records").select("*").eq("user_id", user.id).order("created_at", { ascending: false }) },
+    // Datos de Strava del usuario. Las credenciales (strava_connections) NUNCA se
+    // exportan: contienen tokens y son inaccesibles por RLS de todos modos.
+    { key: "strava_activities", query: supabase.from("strava_activities").select("*").eq("user_id", user.id).order("start_date", { ascending: false }) },
+    { key: "strava_hr_streams", query: supabase.from("strava_hr_streams").select("*").eq("user_id", user.id).order("created_at", { ascending: false }) },
   ];
 
   const result: Record<string, unknown> = {};

@@ -766,6 +766,203 @@ export type Database = {
           },
         ];
       };
+      strava_connections: {
+        Row: {
+          user_id: string;
+          athlete_id: number;
+          athlete_name: string | null;
+          access_token_ciphertext: string;
+          refresh_token_ciphertext: string;
+          token_expires_at: string;
+          scopes: string[];
+          status: string;
+          last_sync_at: string | null;
+          last_sync_status: string | null;
+          last_sync_error: string | null;
+          connected_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          athlete_id: number;
+          athlete_name?: string | null;
+          access_token_ciphertext: string;
+          refresh_token_ciphertext: string;
+          token_expires_at: string;
+          scopes?: string[];
+          status?: string;
+          last_sync_at?: string | null;
+          last_sync_status?: string | null;
+          last_sync_error?: string | null;
+          connected_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          athlete_id?: number;
+          athlete_name?: string | null;
+          access_token_ciphertext?: string;
+          refresh_token_ciphertext?: string;
+          token_expires_at?: string;
+          scopes?: string[];
+          status?: string;
+          last_sync_at?: string | null;
+          last_sync_status?: string | null;
+          last_sync_error?: string | null;
+          connected_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "strava_connections_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      strava_activities: {
+        Row: {
+          id: string;
+          user_id: string;
+          strava_activity_id: number;
+          workout_log_id: string | null;
+          cardio_log_id: string | null;
+          name: string | null;
+          sport_type: string | null;
+          start_date: string;
+          start_date_local: string | null;
+          timezone: string | null;
+          elapsed_time_seconds: number | null;
+          moving_time_seconds: number | null;
+          has_heartrate: boolean;
+          average_heartrate: number | null;
+          max_heartrate: number | null;
+          min_heartrate: number | null;
+          calories: number | null;
+          distance_meters: number | null;
+          device_name: string | null;
+          match_status: string;
+          match_score: number | null;
+          imported_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          strava_activity_id: number;
+          workout_log_id?: string | null;
+          cardio_log_id?: string | null;
+          name?: string | null;
+          sport_type?: string | null;
+          start_date: string;
+          start_date_local?: string | null;
+          timezone?: string | null;
+          elapsed_time_seconds?: number | null;
+          moving_time_seconds?: number | null;
+          has_heartrate?: boolean;
+          average_heartrate?: number | null;
+          max_heartrate?: number | null;
+          min_heartrate?: number | null;
+          calories?: number | null;
+          distance_meters?: number | null;
+          device_name?: string | null;
+          match_status?: string;
+          match_score?: number | null;
+          imported_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          strava_activity_id?: number;
+          workout_log_id?: string | null;
+          cardio_log_id?: string | null;
+          name?: string | null;
+          sport_type?: string | null;
+          start_date?: string;
+          start_date_local?: string | null;
+          timezone?: string | null;
+          elapsed_time_seconds?: number | null;
+          moving_time_seconds?: number | null;
+          has_heartrate?: boolean;
+          average_heartrate?: number | null;
+          max_heartrate?: number | null;
+          min_heartrate?: number | null;
+          calories?: number | null;
+          distance_meters?: number | null;
+          device_name?: string | null;
+          match_status?: string;
+          match_score?: number | null;
+          imported_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "strava_activities_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "strava_activities_workout_log_id_fkey";
+            columns: ["workout_log_id"];
+            isOneToOne: true;
+            referencedRelation: "workout_logs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "strava_activities_cardio_log_id_fkey";
+            columns: ["cardio_log_id"];
+            isOneToOne: true;
+            referencedRelation: "cardio_logs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      strava_hr_streams: {
+        Row: {
+          strava_activity_id: string;
+          user_id: string;
+          time_seconds: number[];
+          heartrate_bpm: number[];
+          original_size: number | null;
+          resolution: string | null;
+          sample_count: number;
+          created_at: string;
+        };
+        Insert: {
+          strava_activity_id: string;
+          user_id: string;
+          time_seconds: number[];
+          heartrate_bpm: number[];
+          original_size?: number | null;
+          resolution?: string | null;
+          sample_count: number;
+          created_at?: string;
+        };
+        Update: {
+          strava_activity_id?: string;
+          user_id?: string;
+          time_seconds?: number[];
+          heartrate_bpm?: number[];
+          original_size?: number | null;
+          resolution?: string | null;
+          sample_count?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "strava_hr_streams_strava_activity_id_fkey";
+            columns: ["strava_activity_id"];
+            isOneToOne: true;
+            referencedRelation: "strava_activities";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       daily_nutrition_logs: {
         Row: {
           id: string;
