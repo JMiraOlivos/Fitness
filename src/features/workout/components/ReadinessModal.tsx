@@ -27,7 +27,7 @@ function ScaleButtons({ value, onSelect }: { value: number; onSelect: (next: num
 
 export function ReadinessModal({ form, onFormChange, onAdapt, onSkip }: ReadinessModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-6">
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-zinc-800 bg-zinc-950 p-6 sm:rounded-3xl">
         <h2 className="text-xl font-black">Antes de partir</h2>
         <p className="mt-1 text-xs text-zinc-500">Cuéntanos cómo llegas hoy — toma menos de 20 segundos.</p>
