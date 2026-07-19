@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { X } from "lucide-react";
 import { AVAILABLE_MINUTES_OPTIONS } from "../domain/workoutMetrics";
 import type { ReadinessForm } from "../types";
@@ -28,9 +29,34 @@ function ScaleButtons({ value, onSelect }: { value: number; onSelect: (next: num
 }
 
 export function ReadinessModal({ form, onFormChange, onAdapt, onSkip, onClose }: ReadinessModalProps) {
+  // Escape always closes the modal — a keyboard escape hatch alongside the X and
+  // the backdrop tap, so the user is never trapped in "Antes de partir".
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-6">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-zinc-800 bg-zinc-950 p-6 sm:rounded-3xl">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Antes de partir"
+      // Tapping the dark backdrop (but not the sheet itself) closes the modal — the
+      // standard "tap outside to dismiss" affordance that users reach for first.
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-6"
+    >
+      <div
+        // Safe-area padding keeps the action buttons clear of the iOS home indicator
+        // so they stay tappable on phones.
+        style={{ paddingBottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-zinc-800 bg-zinc-950 p-6 sm:rounded-3xl"
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-black">Antes de partir</h2>
