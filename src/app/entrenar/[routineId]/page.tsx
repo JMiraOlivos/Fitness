@@ -7,7 +7,6 @@ import { one } from "@/lib/supabaseJoins";
 import { useWorkoutSession } from "@/features/workout/hooks/useWorkoutSession";
 import { defaultInput } from "@/features/workout/domain/workoutMetrics";
 import { ExerciseCard } from "@/features/workout/components/ExerciseCard";
-import { ReadinessModal } from "@/features/workout/components/ReadinessModal";
 import { RegeneratePanel } from "@/features/workout/components/RegeneratePanel";
 import { RestTimerBanner } from "@/features/workout/components/RestTimerBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -140,16 +139,6 @@ export default function EntrenarPage() {
         </section>
       )}
 
-      {session.showReadinessModal && (
-        <ReadinessModal
-          form={session.readinessForm}
-          onFormChange={(patch) => session.setReadinessForm((current) => ({ ...current, ...patch }))}
-          onAdapt={() => void session.iniciarConReadiness(true)}
-          onSkip={() => void session.iniciarConReadiness(false)}
-          onClose={() => session.setShowReadinessModal(false)}
-        />
-      )}
-
       {session.restSecondsLeft !== null && (
         <RestTimerBanner secondsLeft={session.restSecondsLeft} onDismiss={() => session.setRestSecondsLeft(null)} />
       )}
@@ -190,7 +179,7 @@ export default function EntrenarPage() {
 
       <section className="mb-6 grid grid-cols-2 gap-3">
         <button
-          onClick={() => session.setShowReadinessModal(true)}
+          onClick={() => void session.iniciarConReadiness(false)}
           disabled={Boolean(session.workoutLogId) || session.isStarting}
           className="rounded-2xl bg-[#CCFF00] px-4 py-3 font-black text-black inline-flex items-center justify-center gap-2 disabled:opacity-40"
         >
